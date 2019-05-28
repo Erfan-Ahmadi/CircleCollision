@@ -21,35 +21,66 @@
 
 #define Log(str) std::cout << str << std::endl
 
+#define VERTEX_BUFFER_BIND_ID		0
+#define INSTANCE_BUFFER_BIND_ID		1
+
 struct Vertex
 {
 	glm::vec2 pos;
 	glm::vec3 color;
 
-	static VkVertexInputBindingDescription getBindingDesc()
+	static inline VkVertexInputBindingDescription getBindingDesc()
 	{
 		VkVertexInputBindingDescription bindingDesc = {};
 
-		bindingDesc.binding = 0;
+		bindingDesc.binding = VERTEX_BUFFER_BIND_ID;
 		bindingDesc.stride = sizeof(Vertex);
 		bindingDesc.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
 		return bindingDesc;
 	}
 
-	static std::array<VkVertexInputAttributeDescription, 2> getAttributeDescriptions() 
+	static inline std::array<VkVertexInputAttributeDescription, 2> getAttributeDescriptions() 
 	{
 		std::array<VkVertexInputAttributeDescription, 2> attributeDescriptions = {};
 
-		attributeDescriptions[0].binding = 0;
+		attributeDescriptions[0].binding = VERTEX_BUFFER_BIND_ID;
 		attributeDescriptions[0].location = 0;
 		attributeDescriptions[0].format = VK_FORMAT_R32G32_SFLOAT;
 		attributeDescriptions[0].offset = offsetof(Vertex, pos);
 
-		attributeDescriptions[1].binding = 0;
+		attributeDescriptions[1].binding = VERTEX_BUFFER_BIND_ID;
 		attributeDescriptions[1].location = 1;
 		attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
 		attributeDescriptions[1].offset = offsetof(Vertex, color);
+
+		return attributeDescriptions;
+	}
+};
+
+struct Instance
+{
+	glm::vec2 pos;
+	
+	static inline VkVertexInputBindingDescription getBindingDesc()
+	{
+		VkVertexInputBindingDescription bindingDesc = {};
+
+		bindingDesc.binding = INSTANCE_BUFFER_BIND_ID;
+		bindingDesc.stride = sizeof(Instance);
+		bindingDesc.inputRate = VK_VERTEX_INPUT_RATE_INSTANCE;
+
+		return bindingDesc;
+	}
+
+	static inline std::array<VkVertexInputAttributeDescription, 1> getAttributeDescriptions() 
+	{
+		std::array<VkVertexInputAttributeDescription, 1> attributeDescriptions = {};
+
+		attributeDescriptions[0].binding = INSTANCE_BUFFER_BIND_ID;
+		attributeDescriptions[0].location = 2;
+		attributeDescriptions[0].format = VK_FORMAT_R32G32_SFLOAT;
+		attributeDescriptions[0].offset = offsetof(Instance, pos);
 
 		return attributeDescriptions;
 	}
@@ -79,7 +110,6 @@ struct SwapChainSupportDetails
 
 struct UniformBufferObject
 {
-	glm::mat4 model;
 	glm::mat4 view;
 	glm::mat4 proj;
 };
@@ -116,6 +146,7 @@ private:
 	bool create_graphics_pipeline();
 	bool create_vertex_buffer();
 	bool create_index_buffer();
+	bool create_instance_buffer();
 	bool create_uniform_buffers();
 	bool create_descriptor_pool();
 	bool create_descriptor_sets();
@@ -173,9 +204,9 @@ private:
 
 	VkRenderPass render_pass;
 
-	VkDescriptorPool descriptor_pool;
-	std::vector<VkDescriptorSet> descriptor_sets;
-	VkDescriptorSetLayout descriptor_set_layout;
+	VkDescriptorPool ubo_descriptor_pool;
+	std::vector<VkDescriptorSet> ubo_descriptor_sets;
+	VkDescriptorSetLayout ubo_descriptor_set_layout;
 
 	VkPipelineLayout pipeline_layout;
 	VkPipeline graphics_pipeline;
@@ -188,8 +219,13 @@ private:
 
 	VkBuffer vertex_buffer;
 	VkDeviceMemory vertex_buffer_memory;
+
 	VkBuffer index_buffer;
 	VkDeviceMemory index_buffer_memory;
+
+	VkBuffer instance_buffer;
+	VkDeviceMemory instance_buffer_memory;
+	std::vector<Instance> instances;
 
 	VkCommandPool command_pool;
 	std::vector<VkCommandBuffer> command_buffers;

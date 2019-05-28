@@ -30,4 +30,12 @@
       <Filter>Renderer</Filter>
     </ClInclude>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\..\src\Renderer\shaders\shaders.frag">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="..\..\..\src\Renderer\shaders\shaders.vert">
+      <Filter>Resource Files</Filter>
+    </None>
+  </ItemGroup>
 </Project>

@@ -20,7 +20,7 @@ constexpr int INIT_HEIGHT = 600;
 #define POSITIONS_BUFFER_BIND_ID			2 // PER INSTANCE
 #define SCALE_BUFFER_BIND_ID				3 // PER INSTANCE
 
-#define INSTANCE_COUNT 512
+#define INSTANCE_COUNT 32
 
 namespace helper
 {
@@ -252,12 +252,12 @@ static std::vector<char> read_file(const std::string& fileName)
 
 void VulkanRenderer::initialize()
 {
+	srand(time(NULL));
 	validation_layers_enabled = false;
 	char current_path[FILENAME_MAX];
 	GetCurrentDir(current_path, sizeof(current_path));
 	current_path[sizeof(current_path) - 1] = '/0';
 	this->app_path = std::string(current_path);
-	setup_circles();
 }
 
 bool VulkanRenderer::run()
@@ -916,7 +916,7 @@ bool VulkanRenderer::create_graphics_pipeline()
 	rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
 	rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
 	rasterizer.lineWidth = 1.0f;
-	rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE; //VK_FRONT_FACE_COUNTER_CLOCKWISE //VK_FRONT_FACE_CLOCKWISE
+	rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE; //VK_FRONT_FACE_COUNTER_CLOCKWISE //VK_FRONT_FACE_CLOCKWISE
 	rasterizer.depthBiasEnable = VK_FALSE;
 	rasterizer.depthBiasConstantFactor = 0.0f; // Optional
 	rasterizer.depthBiasClamp = 0.0f; // Optional
@@ -1104,6 +1104,8 @@ bool VulkanRenderer::create_index_buffer()
 
 bool VulkanRenderer::create_instance_buffers()
 {
+	setup_circles();
+
 	if (!create_colors_buffer())
 		return false;
 	if (!create_positions_buffer())
@@ -1436,23 +1438,36 @@ void VulkanRenderer::update(const uint32_t& current_image)
 
 	void* data;
 
-	this->circles.positions[0] = glm::vec2(0.0f, sin(time) * 2.0f);
-	this->circles.positions[1] = glm::vec2(cos(time) * 2.0f, sin(time) * 2.0f);
-	this->circles.positions[2] = glm::vec2(cos(time) * 2.0f, cos(time) * 2.0f);
-	this->circles.positions[3] = glm::vec2(cos(time) * 2.0f, 0.0f);
-
-
-	//std::vector<int> collided = std::vector<int>();
-
-	//for(size_t i = 0; i < INSTANCE_COUNT; ++i)
+	//for (size_t i = 0; i < INSTANCE_COUNT; ++i)
 	//{
-	//	for(size_t j = i + 1; j < INSTANCE_COUNT; ++j)
-	//	{
-
-	//	}
+	//	this->circles.positions[i] = glm::vec2(this->circles.positions[i].x, glm::abs((sin(time)) * this->swap_chain_extent.height));
 	//}
 
-	const auto positions_update_size = sizeof(glm::vec2) * 4;
+	std::set<uint32_t> collided = std::set<uint32_t>();
+
+	for (size_t i = 0; i < INSTANCE_COUNT; ++i)
+	{
+		for (size_t j = i + 1; j < INSTANCE_COUNT; ++j)
+		{
+			const auto dx = this->circles.positions[i].x - this->circles.positions[j].x;
+			const auto dy = this->circles.positions[i].y - this->circles.positions[j].y;
+			const auto dis2 = (dy * dy + dx * dx);
+			const auto radii = this->circles.scales[i] + this->circles.scales[j];
+			if (dis2 < radii * radii)
+			{
+				this->circles.colors[i] = glm::vec3(1.0f, 0.0f, 0.0f);
+				this->circles.colors[j] = glm::vec3(1.0f, 0.0f, 0.0f);
+				//collided.emplace(i);
+				//collided.emplace(j);
+			}
+		}
+	}
+
+	vkMapMemory(this->device, this->colors_buffer_memory, 0, sizeof(glm::vec3) * INSTANCE_COUNT, 0, &data);
+	memcpy(data, this->circles.colors.data(), sizeof(glm::vec3) * INSTANCE_COUNT);
+	vkUnmapMemory(this->device, this->colors_buffer_memory);
+
+	const auto positions_update_size = sizeof(glm::vec2) * 10;
 
 	vkMapMemory(this->device, this->positions_buffer_memory, 0, positions_update_size, 0, &data);
 	memcpy(data, this->circles.positions.data(), positions_update_size);
@@ -1462,12 +1477,9 @@ void VulkanRenderer::update(const uint32_t& current_image)
 
 	ubo.view = glm::lookAt(glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
-	ubo.proj = glm::ortho(0.0f, static_cast<float>(INIT_WIDTH), static_cast<float>(INIT_HEIGHT), 0.0f, -1000.0f, 1000.0f);
-	//ubo.proj = glm::ortho(-10.0f, 10.0f, 10.0f, -10.0f, 0.0f, 1000.0f);
-	//ubo.proj = glm::perspective(glm::radians(45.0f), (float)this->swap_chain_extent.width / (float)this->swap_chain_extent.height, 0.1f, 100.0f);
-	//ubo.proj = glm::perspective(glm::radians(60.0f), this->swap_chain_extent.width / (float)this->swap_chain_extent.height, 0.1f, 10.0f);
+	ubo.proj = glm::ortho(0.0f, static_cast<float>(this->swap_chain_extent.width), static_cast<float>(this->swap_chain_extent.height), 0.0f, -1000.0f, 1000.0f);
 
-	ubo.proj[1][1] *= -1;
+	//ubo.proj[1][1] *= -1;
 
 	vkMapMemory(this->device, this->ubo_buffers_memory[current_image], 0, sizeof(ubo), 0, &data);
 	memcpy(data, &ubo, sizeof(ubo));
@@ -1753,8 +1765,8 @@ void VulkanRenderer::setup_circles()
 
 	for (size_t i = 0; i < INSTANCE_COUNT; ++i)
 	{
-		this->circles.positions[i] = glm::vec2(rand() % this->swap_chain_extent.width, i);
+		this->circles.positions[i] = glm::vec2(rand() % this->swap_chain_extent.width, rand() % this->swap_chain_extent.height);
 		this->circles.colors[i] = glm::vec3((rand() % 255) / 255.0f, (rand() % 255) / 255.0f, (rand() % 255) / 255.0f);
-		this->circles.scales[i] = 20.0f;
+		this->circles.scales[i] = 15 + (rand() % 30);
 	}
 }

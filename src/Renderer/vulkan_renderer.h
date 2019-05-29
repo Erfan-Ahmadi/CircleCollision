@@ -88,7 +88,7 @@ struct circles_strcut
 {
 	std::vector<glm::vec2> positions;
 	std::vector<glm::vec3> colors;
-	std::vector<float> scales;
+	std::vector<float> scales; // = radius
 
 	inline void resize(const size_t& size)
 	{

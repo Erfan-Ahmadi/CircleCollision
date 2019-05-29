@@ -1,26 +1,189 @@
 #include "vulkan_renderer.h"
 
-#include <iostream>
-#include <stdexcept>
-#include <algorithm>
-#include <vector>
-#include <cstring>
-#include <cstdlib>
-#include <optional>
 #include <set>
 #include <fstream>
 #include <chrono>
+#include <algorithm>
 
-#define GLM_FORCE_RADIANS
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
+#include "vulkan_initializers.hpp"
+
+#ifdef _WIN32
+#include <direct.h>
+#define GetCurrentDir _getcwd
+#endif
 
 constexpr int INIT_WIDTH = 800;
 constexpr int INIT_HEIGHT = 600;
 
+#define VERTEX_BUFFER_BIND_ID			0
+#define INSTANCE_BUFFER_BIND_ID			1
+#define POSITIONS_BUFFER_BIND_ID		2
+
 #define INSTANCE_COUNT 1024
 
-const void get_circle_model(const size_t & num_segments, model * model_out)
+namespace helper
+{
+	QueueFamilyIndices find_queue_family_indices(const VkPhysicalDevice& physical_device, const VkSurfaceKHR& surface)
+	{
+		QueueFamilyIndices indices;
+
+		uint32_t queueFamilyCount = 0;
+		vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &queueFamilyCount, nullptr);
+
+		std::vector<VkQueueFamilyProperties> queue_families(queueFamilyCount);
+		vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &queueFamilyCount, queue_families.data());
+
+		for (auto i = 0; i < queue_families.size(); ++i)
+		{
+			const auto& queue_familiy = queue_families[i];
+
+			if (queue_familiy.queueCount > 0 && (queue_familiy.queueFlags & VK_QUEUE_GRAPHICS_BIT))
+			{
+				indices.graphics_family = i;
+			}
+
+			VkBool32 present_support = false;
+			vkGetPhysicalDeviceSurfaceSupportKHR(physical_device, i, surface, &present_support);
+
+			if (queue_familiy.queueCount > 0 && present_support)
+				indices.present_family = i;
+
+			if (indices.is_complete())
+				break;
+		}
+
+		return indices;
+	}
+	
+	uint32_t find_memory_type(uint32_t type_filter, VkMemoryPropertyFlags properties, VkPhysicalDevice physical_device)
+	{
+		VkPhysicalDeviceMemoryProperties mem_properties;
+		vkGetPhysicalDeviceMemoryProperties(physical_device, &mem_properties);
+
+		for (uint32_t i = 0; i < mem_properties.memoryTypeCount; ++i)
+		{
+			if (type_filter & (1 << i) && (mem_properties.memoryTypes[i].propertyFlags & properties) == properties)
+			{
+				return i;
+			}
+		}
+
+		return 0;
+	}
+
+	bool create_buffer(
+		VkDevice device,
+		VkPhysicalDevice physical_device,
+		VkDeviceSize buffer_size,
+		VkBufferUsageFlags usage,
+		VkMemoryPropertyFlags memory_properties,
+		VkBuffer& buffer,
+		VkDeviceMemory& buffer_memory)
+	{
+		VkBufferCreateInfo  buffer_info = {};
+
+		buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+		buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		buffer_info.size = buffer_size;
+		buffer_info.usage = usage;
+
+		if (vkCreateBuffer(device, &buffer_info, nullptr, &buffer) != VK_SUCCESS)
+		{
+			return false;
+		}
+
+		VkMemoryRequirements memory_requirements;
+		vkGetBufferMemoryRequirements(device, buffer, &memory_requirements);
+
+		VkMemoryAllocateInfo alloc_info = {};
+		alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+
+		alloc_info.memoryTypeIndex = find_memory_type(
+			memory_requirements.memoryTypeBits,
+			memory_properties, physical_device);
+
+		alloc_info.allocationSize = memory_requirements.size;
+
+		if (vkAllocateMemory(device, &alloc_info, nullptr, &buffer_memory) != VK_SUCCESS)
+		{
+			return false;
+		}
+
+		if (vkBindBufferMemory(device, buffer, buffer_memory, 0) != VK_SUCCESS)
+		{
+			return false;
+		}
+
+		return true;
+	}
+
+	bool copy_buffer(
+		VkDevice device,
+		VkCommandPool stage_command_pool,
+		VkQueue queue,
+		VkBuffer& src_buffer,
+		VkBuffer& dst_buffer,
+		VkDeviceSize buffer_size)
+	{
+		VkCommandBuffer command_buffer;
+
+		VkCommandBufferAllocateInfo command_buffer_info = {};
+		command_buffer_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+		command_buffer_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+		command_buffer_info.commandPool = stage_command_pool;
+		command_buffer_info.commandBufferCount = 1;
+
+		if (vkAllocateCommandBuffers(device, &command_buffer_info, &command_buffer) != VK_SUCCESS)
+		{
+			return false;
+		}
+
+		// Record
+		VkCommandBufferBeginInfo cmd_begin = {};
+		cmd_begin.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+		cmd_begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+		vkBeginCommandBuffer(command_buffer, &cmd_begin);
+
+		VkBufferCopy copy_region = {};
+		copy_region.srcOffset = 0;
+		copy_region.dstOffset = 0;
+		copy_region.size = buffer_size;
+		vkCmdCopyBuffer(command_buffer, src_buffer, dst_buffer, 1, &copy_region);
+
+		vkEndCommandBuffer(command_buffer);
+
+		// Submit
+		VkSubmitInfo cmd_submit_info = {};
+		cmd_submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+		cmd_submit_info.commandBufferCount = 1;
+		cmd_submit_info.pCommandBuffers = &command_buffer;
+		vkQueueSubmit(queue, 1, &cmd_submit_info, nullptr);
+		vkQueueWaitIdle(queue);
+
+		// Free
+		vkFreeCommandBuffers(device, stage_command_pool, 1, &command_buffer);
+
+		return true;
+	}
+
+	VkShaderModule create_shader_module(VkDevice device, const std::vector<char>& code)
+	{
+		VkShaderModuleCreateInfo create_info = {};
+		create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+		create_info.codeSize = code.size();
+		create_info.pCode = reinterpret_cast<const uint32_t*>(code.data());
+
+		VkShaderModule shader_module;
+
+		if (vkCreateShaderModule(device, &create_info, nullptr, &shader_module) != VK_SUCCESS)
+			Log("Shader Coudn't be created");
+
+		return shader_module;
+	}
+};
+
+const void get_circle_model(const size_t& num_segments, model* model_out)
 {
 	model_out->vertices.resize(num_segments + 1);
 	model_out->indices.resize(num_segments * 3);
@@ -31,7 +194,7 @@ const void get_circle_model(const size_t & num_segments, model * model_out)
 
 	for (size_t i = 1; i < num_segments + 1; ++i)
 	{
-		model_out->vertices[i] = { {glm::cos(i * step) / 10.0f, glm::sin(i * step) / 10.0f}, {1.0f, 1.0f, 1.0f} };
+		model_out->vertices[i] = { {glm::cos(i * step), glm::sin(i * step)}, {1.0f, 1.0f, 1.0f} };
 
 		model_out->indices[i * 3 - 3] = 0;
 		model_out->indices[i * 3 - 2] = i;
@@ -86,20 +249,13 @@ static std::vector<char> read_file(const std::string& fileName)
 	return buffer;
 }
 
-VulkanRenderer::VulkanRenderer() :
-	is_released(false),
-	validation_layers_enabled(false),
-	physical_device(VK_NULL_HANDLE)
+void VulkanRenderer::initialize()
 {
+	validation_layers_enabled = false;
 	char current_path[FILENAME_MAX];
 	GetCurrentDir(current_path, sizeof(current_path));
 	current_path[sizeof(current_path) - 1] = '/0';
 	this->app_path = std::string(current_path);
-}
-
-VulkanRenderer::~VulkanRenderer()
-{
-	release();
 }
 
 bool VulkanRenderer::run()
@@ -165,6 +321,8 @@ bool VulkanRenderer::setup_vulkan()
 	if (!create_index_buffer())
 		return false;
 	if (!create_instance_buffer())
+		return false;
+	if (!create_positions_buffer())
 		return false;
 	if (!create_uniform_buffers())
 		return false;
@@ -356,14 +514,14 @@ bool VulkanRenderer::pick_physical_device()
 
 	for (auto i = 0; i < available_physical_devices_count; ++i)
 	{
-		const auto device = available_physical_devices[i];
+		const auto physical_device = available_physical_devices[i];
 		VkPhysicalDeviceProperties device_properties;
 		VkPhysicalDeviceFeatures device_features;
-		vkGetPhysicalDeviceProperties(device, &device_properties);
-		vkGetPhysicalDeviceFeatures(device, &device_features);
+		vkGetPhysicalDeviceProperties(physical_device, &device_properties);
+		vkGetPhysicalDeviceFeatures(physical_device, &device_features);
 
 		//I just skip here since i only have Intel's GPU on Surface Pro 6 
-		if (find_queue_family_indices(device).is_complete())
+		if (helper::find_queue_family_indices(physical_device, this->surface).is_complete())
 		{
 			selected_device = i;
 			break;
@@ -379,38 +537,6 @@ bool VulkanRenderer::pick_physical_device()
 	this->physical_device = available_physical_devices[selected_device];
 
 	return true;
-}
-
-QueueFamilyIndices VulkanRenderer::find_queue_family_indices(VkPhysicalDevice device)
-{
-	QueueFamilyIndices indices;
-
-	uint32_t queueFamilyCount = 0;
-	vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
-
-	std::vector<VkQueueFamilyProperties> queue_families(queueFamilyCount);
-	vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queue_families.data());
-
-	for (auto i = 0; i < queue_families.size(); ++i)
-	{
-		const auto& queue_familiy = queue_families[i];
-
-		if (queue_familiy.queueCount > 0 && (queue_familiy.queueFlags & VK_QUEUE_GRAPHICS_BIT))
-		{
-			indices.graphics_family = i;
-		}
-
-		VkBool32 present_support = false;
-		vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &present_support);
-
-		if (queue_familiy.queueCount > 0 && present_support)
-			indices.present_family = i;
-
-		if (indices.is_complete())
-			break;
-	}
-
-	return indices;
 }
 
 bool VulkanRenderer::check_device_extensions_support()
@@ -433,7 +559,7 @@ bool VulkanRenderer::create_logical_device()
 	if (!check_device_extensions_support())
 		return false;
 
-	this->family_indices = find_queue_family_indices(this->physical_device);
+	this->family_indices = helper::find_queue_family_indices(this->physical_device, this->surface);
 	std::set<uint32_t> unique_queue_families = { family_indices.graphics_family.value(), family_indices.present_family.value() };
 
 	std::vector<VkDeviceQueueCreateInfo> queue_create_infos;
@@ -727,10 +853,8 @@ bool VulkanRenderer::create_graphics_pipeline()
 		return false;
 	}
 
-	VkShaderModule vert_shader_module = create_shader_module(vert_shader);
-	VkShaderModule frag_shader_module = create_shader_module(frag_shader);
-
-	// TODO: READ LATER (I am SLEEPY and most of it was copy paste because i'm lazy)
+	VkShaderModule vert_shader_module = helper::create_shader_module(this->device, vert_shader);
+	VkShaderModule frag_shader_module = helper::create_shader_module(this->device, frag_shader);
 
 	// Shaders
 	VkPipelineShaderStageCreateInfo vert_shader_stage_info = {};
@@ -747,22 +871,19 @@ bool VulkanRenderer::create_graphics_pipeline()
 
 	VkPipelineShaderStageCreateInfo shader_stages[] = { vert_shader_stage_info, frag_shader_stage_info };
 
-	// Pipeline Fixed Funtions
-
 	std::vector<VkVertexInputBindingDescription> bindings =
 	{
-		Vertex::getBindingDesc(),
-		Instance::getBindingDesc(),
+		initializers::vertex_input_binding_description(VERTEX_BUFFER_BIND_ID, sizeof(Vertex), VK_VERTEX_INPUT_RATE_VERTEX),
+		initializers::vertex_input_binding_description(INSTANCE_BUFFER_BIND_ID, sizeof(Instance), VK_VERTEX_INPUT_RATE_INSTANCE),
+		initializers::vertex_input_binding_description(POSITIONS_BUFFER_BIND_ID, sizeof(glm::vec2), VK_VERTEX_INPUT_RATE_INSTANCE),
 	};
 
-	auto vertex_attribute_desc = Vertex::getAttributeDescriptions();
-	auto instance_attribute_desc = Instance::getAttributeDescriptions();
-
-	std::array<VkVertexInputAttributeDescription, 3> attributes =
+	std::vector<VkVertexInputAttributeDescription> attributes =
 	{
-		vertex_attribute_desc[0],
-		vertex_attribute_desc[1],
-		instance_attribute_desc[0],
+		initializers::vertex_input_attribute_description(VERTEX_BUFFER_BIND_ID, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(Vertex, pos)),
+		initializers::vertex_input_attribute_description(POSITIONS_BUFFER_BIND_ID, 1, VK_FORMAT_R32G32_SFLOAT, 0),
+		initializers::vertex_input_attribute_description(INSTANCE_BUFFER_BIND_ID, 2, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Instance, color)),
+		initializers::vertex_input_attribute_description(INSTANCE_BUFFER_BIND_ID, 3, VK_FORMAT_R32_SFLOAT, offsetof(Instance, scale)),
 	};
 
 	// VI
@@ -893,13 +1014,15 @@ bool VulkanRenderer::create_graphics_pipeline()
 
 bool VulkanRenderer::create_vertex_buffer()
 {
-	get_circle_model(20, &this->circle);
+	get_circle_model(7, &this->circle);
 	const VkDeviceSize buffer_size = sizeof(Vertex) * this->circle.vertices.size();
 
 	VkBuffer staging_buffer;
 	VkDeviceMemory staging_buffer_memory;
 
-	if (!create_buffer(
+	if (!helper::create_buffer(
+		this->device,
+		this->physical_device,
 		buffer_size,
 		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
@@ -914,7 +1037,9 @@ bool VulkanRenderer::create_vertex_buffer()
 	memcpy(data, this->circle.vertices.data(), (size_t)buffer_size);
 	vkUnmapMemory(this->device, staging_buffer_memory);
 
-	if (!create_buffer(
+	if (!helper::create_buffer(
+		this->device,
+		this->physical_device,
 		buffer_size,
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
@@ -924,7 +1049,7 @@ bool VulkanRenderer::create_vertex_buffer()
 		return false;
 	}
 
-	copy_buffer(staging_buffer, this->vertex_buffer, buffer_size);
+	helper::copy_buffer(this->device, this->command_pool, this->graphics_queue, staging_buffer, this->vertex_buffer, buffer_size);
 
 	vkDestroyBuffer(this->device, staging_buffer, nullptr);
 	vkFreeMemory(this->device, staging_buffer_memory, nullptr);
@@ -939,7 +1064,9 @@ bool VulkanRenderer::create_index_buffer()
 	VkBuffer staging_buffer;
 	VkDeviceMemory staging_buffer_memory;
 
-	if (!create_buffer(
+	if (!helper::create_buffer(
+		this->device,
+		this->physical_device,
 		buffer_size,
 		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
@@ -954,7 +1081,9 @@ bool VulkanRenderer::create_index_buffer()
 	memcpy(data, this->circle.indices.data(), (size_t)buffer_size);
 	vkUnmapMemory(this->device, staging_buffer_memory);
 
-	if (!create_buffer(
+	if (!helper::create_buffer(
+		this->device,
+		this->physical_device,
 		buffer_size,
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
@@ -964,7 +1093,7 @@ bool VulkanRenderer::create_index_buffer()
 		return false;
 	}
 
-	copy_buffer(staging_buffer, this->index_buffer, buffer_size);
+	helper::copy_buffer(this->device, this->command_pool, this->graphics_queue, staging_buffer, this->index_buffer, buffer_size);
 
 	vkDestroyBuffer(this->device, staging_buffer, nullptr);
 	vkFreeMemory(this->device, staging_buffer_memory, nullptr);
@@ -973,33 +1102,86 @@ bool VulkanRenderer::create_index_buffer()
 }
 
 bool VulkanRenderer::create_instance_buffer()
-{
+{	
 	this->instances.resize(INSTANCE_COUNT);
 	for (size_t i = 0; i < INSTANCE_COUNT; ++i)
 	{
-		this->instances[i].pos = glm::vec2((rand() % 400) / 200.0f * (1 - rand() % 3), (rand() % 400) / 200.0f * (1 - rand() % 3));
+		this->instances[i].color = glm::vec3((rand() % 255) / 255.0f, (rand() % 255) / 255.0f, (rand() % 255) / 255.0f);
+		this->instances[i].scale = 0.2f / (rand() % 3 + 1);
 	}
 
-	const VkDeviceSize buffer_size = sizeof(Instance) * this->instances.size();
+	const VkDeviceSize buffer_size = sizeof(Instance) * INSTANCE_COUNT;
 
-	if(!create_buffer(
+	VkBuffer staging_buffer;
+	VkDeviceMemory staging_buffer_memory;
+
+	if (!helper::create_buffer(
+		this->device,
+		this->physical_device,
 		buffer_size,
-		VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-		VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT,
+		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+		staging_buffer,
+		staging_buffer_memory))
+	{
+		return false;
+	}
+
+	void* data = nullptr;
+	vkMapMemory(this->device, staging_buffer_memory, 0, buffer_size, 0, &data);
+	memcpy(data, instances.data(), buffer_size);
+	vkUnmapMemory(this->device, staging_buffer_memory);
+
+	if (!helper::create_buffer(
+		this->device,
+		this->physical_device,
+		buffer_size,
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 		this->instance_buffer,
 		this->instance_buffer_memory))
 	{
 		return false;
 	}
-	
-	void* data = nullptr;
-	vkMapMemory(this->device, this->instance_buffer_memory, 0, buffer_size, 0, &data);
-	memcpy(data, instances.data(), buffer_size);
-	vkUnmapMemory(this->device, this->instance_buffer_memory);
+
+	helper::copy_buffer(this->device, this->command_pool, this->graphics_queue, staging_buffer, this->instance_buffer, buffer_size);
+
+	vkDestroyBuffer(this->device, staging_buffer, nullptr);
+	vkFreeMemory(this->device, staging_buffer_memory, nullptr);
 
 	return true;
 }
 
+bool VulkanRenderer::create_positions_buffer()
+{
+	auto positions = std::vector<glm::vec2>(INSTANCE_COUNT);
+
+	for (size_t i = 0; i < INSTANCE_COUNT; ++i)
+	{
+		positions[i] = glm::vec2((rand() % 400) / 200.0f * ((rand() % 2) * 2 - 1), (rand() % 200) / 200.0f * ((rand() % 2) * 2 - 1));
+	}
+
+	const VkDeviceSize buffer_size = sizeof(glm::vec2) * INSTANCE_COUNT;
+
+	if (!helper::create_buffer(
+		this->device,
+		this->physical_device,
+		buffer_size,
+		VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+		VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT,
+		this->positions_buffer,
+		this->positions_buffer_memory))
+	{
+		return false;
+	}
+
+	void* data = nullptr;
+	vkMapMemory(this->device, this->positions_buffer_memory, 0, buffer_size, 0, &data);
+	memcpy(data, positions.data(), buffer_size);
+	vkUnmapMemory(this->device, this->positions_buffer_memory);
+
+	return true;
+}
 
 bool VulkanRenderer::create_uniform_buffers()
 {
@@ -1011,7 +1193,9 @@ bool VulkanRenderer::create_uniform_buffers()
 
 	for (size_t i = 0; i < size; ++i)
 	{
-		if (!this->create_buffer(
+		if (!helper::create_buffer(
+			this->device,
+			this->physical_device,
 			buffer_size,
 			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
@@ -1174,14 +1358,17 @@ bool VulkanRenderer::create_command_buffers()
 
 			VkBuffer vertex_buffers[] = { this->vertex_buffer };
 			VkBuffer instance_buffers[] = { this->instance_buffer };
+			VkBuffer positions_buffers[] = { this->positions_buffer };
 			VkDeviceSize offsets[] = { 0 };
 
 			// Circles
 			vkCmdBindDescriptorSets(this->command_buffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, this->pipeline_layout, 0, 1, &this->ubo_descriptor_sets[i], 0, nullptr);
 
 			vkCmdBindVertexBuffers(this->command_buffers[i], VERTEX_BUFFER_BIND_ID, 1, vertex_buffers, offsets);
-			
+
 			vkCmdBindVertexBuffers(this->command_buffers[i], INSTANCE_BUFFER_BIND_ID, 1, instance_buffers, offsets);
+			
+			vkCmdBindVertexBuffers(this->command_buffers[i], POSITIONS_BUFFER_BIND_ID, 1, positions_buffers, offsets);
 
 			vkCmdBindIndexBuffer(this->command_buffers[i], this->index_buffer, 0, VK_INDEX_TYPE_UINT16);
 
@@ -1307,7 +1494,7 @@ bool VulkanRenderer::set_viewport_scissor()
 	return true;
 }
 
-void VulkanRenderer::update_ubo(uint32_t current_image)
+void VulkanRenderer::update(const uint32_t& current_image)
 {
 	static auto start_time = std::chrono::high_resolution_clock::now();
 
@@ -1315,13 +1502,20 @@ void VulkanRenderer::update_ubo(uint32_t current_image)
 
 	float time = std::chrono::duration<float, std::chrono::seconds::period>(now - start_time).count();
 
+	//for (size_t i = 0; i < this->instances.size(); ++i)
+	//	this->instances[i].pos = glm::vec2(i / 10.0f + cos(time) * 0.5f, i / 10.0f + sin(time) * 0.5f);
+
+	void* data;
+	//vkMapMemory(this->device, this->instance_buffer_memory, 0, sizeof(Instance) * this->instances.size(), 0, &data);
+	//memcpy(data, &this->instances[0], sizeof(Instance) * this->instances.size());
+	//vkUnmapMemory(this->device, this->instance_buffer_memory);
+
 	UniformBufferObject ubo = {};
 
 	ubo.view = glm::lookAt(glm::vec3(0.0f, 0.0f, +3.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 	ubo.proj = glm::perspective(glm::radians(60.0f), this->swap_chain_extent.width / (float)this->swap_chain_extent.height, 0.1f, 10.0f);
 	ubo.proj[1][1] *= -1;
 
-	void* data;
 	vkMapMemory(this->device, this->ubo_buffers_memory[current_image], 0, sizeof(ubo), 0, &data);
 	memcpy(data, &ubo, sizeof(ubo));
 	vkUnmapMemory(this->device, this->ubo_buffers_memory[current_image]);
@@ -1329,6 +1523,8 @@ void VulkanRenderer::update_ubo(uint32_t current_image)
 
 bool VulkanRenderer::draw_frame()
 {
+	auto start_time = std::chrono::high_resolution_clock::now();
+
 	vkWaitForFences(this->device, 1, &this->draw_fences[this->current_frame], VK_TRUE, std::numeric_limits<uint64_t>::max());
 
 	// image_index vs current_frame
@@ -1363,7 +1559,7 @@ bool VulkanRenderer::draw_frame()
 	VkPipelineStageFlags wait_stages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
 
 	// Update UBO
-	update_ubo(image_index);
+	update(image_index);
 
 	VkSubmitInfo submit_info = {};
 	submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -1410,129 +1606,15 @@ bool VulkanRenderer::draw_frame()
 
 	this->current_frame = (this->current_frame + 1) % this->num_frames;
 
-	return true;
-}
+	auto now = std::chrono::high_resolution_clock::now();
 
-bool VulkanRenderer::create_buffer(
-	VkDeviceSize buffer_size,
-	VkBufferUsageFlags usage,
-	VkMemoryPropertyFlags memory_properties,
-	VkBuffer& buffer,
-	VkDeviceMemory& buffer_memory)
-{
-	VkBufferCreateInfo  buffer_info = {};
+	//const float time = std::chrono::duration<float, std::chrono::milliseconds::period>(now - start_time).count();
+	//const float fps = 1000.0f / time;
+	//sprintf_s(title, "Draw in %f ms = %f FPS", time, fps);
 
-	buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	buffer_info.size = buffer_size;
-	buffer_info.usage = usage;
-
-	if (vkCreateBuffer(this->device, &buffer_info, nullptr, &buffer) != VK_SUCCESS)
-	{
-		return false;
-	}
-
-	VkMemoryRequirements memory_requirements;
-	vkGetBufferMemoryRequirements(this->device, buffer, &memory_requirements);
-
-	VkMemoryAllocateInfo alloc_info = {};
-	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-
-	alloc_info.memoryTypeIndex = find_memory_type(
-		memory_requirements.memoryTypeBits,
-		memory_properties);
-
-	alloc_info.allocationSize = memory_requirements.size;
-
-	if (vkAllocateMemory(this->device, &alloc_info, nullptr, &buffer_memory) != VK_SUCCESS)
-	{
-		return false;
-	}
-
-	if (vkBindBufferMemory(this->device, buffer, buffer_memory, 0) != VK_SUCCESS)
-	{
-		return false;
-	}
+	//glfwSetWindowTitle(this->window, title);
 
 	return true;
-}
-
-bool VulkanRenderer::copy_buffer(
-	VkBuffer& src_buffer,
-	VkBuffer& dst_buffer,
-	VkDeviceSize buffer_size)
-{
-	VkCommandBuffer command_buffer;
-
-	VkCommandBufferAllocateInfo command_buffer_info = {};
-	command_buffer_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-	command_buffer_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-	command_buffer_info.commandPool = this->command_pool;
-	command_buffer_info.commandBufferCount = 1;
-
-	if (vkAllocateCommandBuffers(this->device, &command_buffer_info, &command_buffer) != VK_SUCCESS)
-	{
-		return false;
-	}
-
-	// Record
-	VkCommandBufferBeginInfo cmd_begin = {};
-	cmd_begin.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-	cmd_begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-	vkBeginCommandBuffer(command_buffer, &cmd_begin);
-
-	VkBufferCopy copy_region = {};
-	copy_region.srcOffset = 0;
-	copy_region.dstOffset = 0;
-	copy_region.size = buffer_size;
-	vkCmdCopyBuffer(command_buffer, src_buffer, dst_buffer, 1, &copy_region);
-
-	vkEndCommandBuffer(command_buffer);
-
-	// Submit
-	VkSubmitInfo cmd_submit_info = {};
-	cmd_submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-	cmd_submit_info.commandBufferCount = 1;
-	cmd_submit_info.pCommandBuffers = &command_buffer;
-	vkQueueSubmit(this->graphics_queue, 1, &cmd_submit_info, nullptr);
-	vkQueueWaitIdle(this->graphics_queue);
-
-	// Free
-	vkFreeCommandBuffers(this->device, this->command_pool, 1, &command_buffer);
-
-	return true;
-}
-
-VkShaderModule VulkanRenderer::create_shader_module(const std::vector<char>& code)
-{
-	VkShaderModuleCreateInfo create_info = {};
-	create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-	create_info.codeSize = code.size();
-	create_info.pCode = reinterpret_cast<const uint32_t*>(code.data());
-
-	VkShaderModule shader_module;
-
-	if (vkCreateShaderModule(this->device, &create_info, nullptr, &shader_module) != VK_SUCCESS)
-		Log("Shader Coudn't be created");
-
-	return shader_module;
-}
-
-uint32_t VulkanRenderer::find_memory_type(uint32_t type_filter, VkMemoryPropertyFlags properties)
-{
-	VkPhysicalDeviceMemoryProperties mem_properties;
-	vkGetPhysicalDeviceMemoryProperties(this->physical_device, &mem_properties);
-
-	for (uint32_t i = 0; i < mem_properties.memoryTypeCount; ++i)
-	{
-		if (type_filter & (1 << i) && (mem_properties.memoryTypes[i].propertyFlags & properties) == properties)
-		{
-			return i;
-		}
-	}
-
-	return 0;
 }
 
 bool VulkanRenderer::main_loop()
@@ -1570,7 +1652,7 @@ bool VulkanRenderer::release()
 
 		vkDestroyBuffer(this->device, this->index_buffer, nullptr);
 		vkFreeMemory(this->device, this->index_buffer_memory, nullptr);
-		
+
 		vkDestroyBuffer(this->device, this->instance_buffer, nullptr);
 		vkFreeMemory(this->device, this->instance_buffer_memory, nullptr);
 

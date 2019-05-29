@@ -29,6 +29,12 @@
     <ClInclude Include="..\..\..\src\Renderer\vulkan_renderer.h">
       <Filter>Renderer</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\src\Renderer\vulkan_initializers.hpp">
+      <Filter>Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Renderer\common.hpp">
+      <Filter>Renderer</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\src\Renderer\shaders\shaders.frag">

@@ -140,6 +140,8 @@
     <ClCompile Include="..\..\..\src\Renderer\vulkan_renderer.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\..\src\Renderer\common.hpp" />
+    <ClInclude Include="..\..\..\src\Renderer\vulkan_initializers.hpp" />
     <ClInclude Include="..\..\..\src\Renderer\vulkan_renderer.h" />
   </ItemGroup>
   <ItemGroup>

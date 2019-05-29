@@ -84,21 +84,17 @@ struct UniformBufferObject
 	glm::mat4 proj;
 };
 
-struct color_scale
-{
-	glm::vec3 color;
-	float scale;
-};
-
 struct circles_strcut
 {
 	std::vector<glm::vec2> positions;
-	std::vector<color_scale> colors_scale;
+	std::vector<glm::vec3> colors;
+	std::vector<float> scales;
 
 	inline void resize(const size_t& size)
 	{
 		positions.resize(size);
-		colors_scale.resize(size);
+		colors.resize(size);
+		scales.resize(size);
 	}
 };
  
@@ -132,8 +128,7 @@ private:
 	bool create_graphics_pipeline();
 	bool create_vertex_buffer();
 	bool create_index_buffer();
-	bool create_color_scale_buffer();
-	bool create_positions_buffer();
+	bool create_instance_buffers();
 	bool create_uniform_buffers();
 	bool create_descriptor_pool();
 	bool create_descriptor_sets();
@@ -141,6 +136,10 @@ private:
 	bool create_command_pool();
 	bool create_command_buffers();
 	bool create_sync_objects();
+	
+	bool create_colors_buffer();
+	bool create_positions_buffer();
+	bool create_scales_buffer();
 
 	bool cleanup_swap_chain();
 	bool recreate_swap_chain();
@@ -167,8 +166,11 @@ private:
 	VkBuffer index_buffer;
 	VkDeviceMemory index_buffer_memory;
 
-	VkBuffer color_scale_buffer;
-	VkDeviceMemory color_scale_buffer_memory;
+	VkBuffer colors_buffer;
+	VkDeviceMemory colors_buffer_memory;
+
+	VkBuffer scales_buffer;
+	VkDeviceMemory scales_buffer_memory;
 	
 	VkBuffer positions_buffer;
 	VkDeviceMemory positions_buffer_memory;

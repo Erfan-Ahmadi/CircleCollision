@@ -84,10 +84,22 @@ struct UniformBufferObject
 	glm::mat4 proj;
 };
 
-struct Instance
+struct color_scale
 {
 	glm::vec3 color;
 	float scale;
+};
+
+struct circles_strcut
+{
+	std::vector<glm::vec2> positions;
+	std::vector<color_scale> colors_scale;
+
+	inline void resize(const size_t& size)
+	{
+		positions.resize(size);
+		colors_scale.resize(size);
+	}
 };
  
 struct VulkanRenderer
@@ -120,7 +132,7 @@ private:
 	bool create_graphics_pipeline();
 	bool create_vertex_buffer();
 	bool create_index_buffer();
-	bool create_instance_buffer();
+	bool create_color_scale_buffer();
 	bool create_positions_buffer();
 	bool create_uniform_buffers();
 	bool create_descriptor_pool();
@@ -139,10 +151,12 @@ private:
 	bool draw_frame();
 
 	bool main_loop();
+	
+	// Sample ----------------
+	model circle_model;
 
-	// Sample
-
-	model circle;
+	void setup_circles();
+	circles_strcut circles;
 
 	std::vector<VkBuffer> ubo_buffers;
 	std::vector<VkDeviceMemory> ubo_buffers_memory;
@@ -153,9 +167,8 @@ private:
 	VkBuffer index_buffer;
 	VkDeviceMemory index_buffer_memory;
 
-	VkBuffer instance_buffer;
-	VkDeviceMemory instance_buffer_memory;
-	std::vector<Instance> instances;
+	VkBuffer color_scale_buffer;
+	VkDeviceMemory color_scale_buffer_memory;
 	
 	VkBuffer positions_buffer;
 	VkDeviceMemory positions_buffer_memory;
@@ -166,8 +179,7 @@ private:
 
 	VkPipelineLayout pipeline_layout;
 	VkPipeline graphics_pipeline;
-
-	// Sample
+	// Sample ----------------
 
 
 	//	Vulkan

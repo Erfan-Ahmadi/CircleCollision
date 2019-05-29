@@ -15,11 +15,11 @@
 constexpr int INIT_WIDTH = 800;
 constexpr int INIT_HEIGHT = 600;
 
-#define VERTEX_BUFFER_BIND_ID			0
-#define INSTANCE_BUFFER_BIND_ID			1
-#define POSITIONS_BUFFER_BIND_ID		2
+#define VERTEX_BUFFER_BIND_ID				0 // PER VERTEX
+#define COLOR_SCALE_BUFFER_BIND_ID			1 // PER INSTANCE
+#define POSITIONS_BUFFER_BIND_ID			2 // PER INSTANCE
 
-#define INSTANCE_COUNT 1024
+#define INSTANCE_COUNT 16
 
 namespace helper
 {
@@ -256,6 +256,7 @@ void VulkanRenderer::initialize()
 	GetCurrentDir(current_path, sizeof(current_path));
 	current_path[sizeof(current_path) - 1] = '/0';
 	this->app_path = std::string(current_path);
+	setup_circles();
 }
 
 bool VulkanRenderer::run()
@@ -320,7 +321,7 @@ bool VulkanRenderer::setup_vulkan()
 		return false;
 	if (!create_index_buffer())
 		return false;
-	if (!create_instance_buffer())
+	if (!create_color_scale_buffer())
 		return false;
 	if (!create_positions_buffer())
 		return false;
@@ -874,7 +875,7 @@ bool VulkanRenderer::create_graphics_pipeline()
 	std::vector<VkVertexInputBindingDescription> bindings =
 	{
 		initializers::vertex_input_binding_description(VERTEX_BUFFER_BIND_ID, sizeof(Vertex), VK_VERTEX_INPUT_RATE_VERTEX),
-		initializers::vertex_input_binding_description(INSTANCE_BUFFER_BIND_ID, sizeof(Instance), VK_VERTEX_INPUT_RATE_INSTANCE),
+		initializers::vertex_input_binding_description(COLOR_SCALE_BUFFER_BIND_ID, sizeof(color_scale), VK_VERTEX_INPUT_RATE_INSTANCE),
 		initializers::vertex_input_binding_description(POSITIONS_BUFFER_BIND_ID, sizeof(glm::vec2), VK_VERTEX_INPUT_RATE_INSTANCE),
 	};
 
@@ -882,8 +883,8 @@ bool VulkanRenderer::create_graphics_pipeline()
 	{
 		initializers::vertex_input_attribute_description(VERTEX_BUFFER_BIND_ID, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(Vertex, pos)),
 		initializers::vertex_input_attribute_description(POSITIONS_BUFFER_BIND_ID, 1, VK_FORMAT_R32G32_SFLOAT, 0),
-		initializers::vertex_input_attribute_description(INSTANCE_BUFFER_BIND_ID, 2, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Instance, color)),
-		initializers::vertex_input_attribute_description(INSTANCE_BUFFER_BIND_ID, 3, VK_FORMAT_R32_SFLOAT, offsetof(Instance, scale)),
+		initializers::vertex_input_attribute_description(COLOR_SCALE_BUFFER_BIND_ID, 2, VK_FORMAT_R32G32B32_SFLOAT, offsetof(color_scale, color)),
+		initializers::vertex_input_attribute_description(COLOR_SCALE_BUFFER_BIND_ID, 3, VK_FORMAT_R32_SFLOAT, offsetof(color_scale, scale)),
 	};
 
 	// VI
@@ -1014,8 +1015,8 @@ bool VulkanRenderer::create_graphics_pipeline()
 
 bool VulkanRenderer::create_vertex_buffer()
 {
-	get_circle_model(7, &this->circle);
-	const VkDeviceSize buffer_size = sizeof(Vertex) * this->circle.vertices.size();
+	get_circle_model(8, &this->circle_model);
+	const VkDeviceSize buffer_size = sizeof(Vertex) * this->circle_model.vertices.size();
 
 	VkBuffer staging_buffer;
 	VkDeviceMemory staging_buffer_memory;
@@ -1034,7 +1035,7 @@ bool VulkanRenderer::create_vertex_buffer()
 
 	void* data;
 	vkMapMemory(this->device, staging_buffer_memory, 0, buffer_size, 0, &data);
-	memcpy(data, this->circle.vertices.data(), (size_t)buffer_size);
+	memcpy(data, this->circle_model.vertices.data(), (size_t)buffer_size);
 	vkUnmapMemory(this->device, staging_buffer_memory);
 
 	if (!helper::create_buffer(
@@ -1059,7 +1060,7 @@ bool VulkanRenderer::create_vertex_buffer()
 
 bool VulkanRenderer::create_index_buffer()
 {
-	const VkDeviceSize buffer_size = sizeof(uint16_t) * this->circle.indices.size();
+	const VkDeviceSize buffer_size = sizeof(uint16_t) * this->circle_model.indices.size();
 
 	VkBuffer staging_buffer;
 	VkDeviceMemory staging_buffer_memory;
@@ -1078,7 +1079,7 @@ bool VulkanRenderer::create_index_buffer()
 
 	void* data;
 	vkMapMemory(this->device, staging_buffer_memory, 0, buffer_size, 0, &data);
-	memcpy(data, this->circle.indices.data(), (size_t)buffer_size);
+	memcpy(data, this->circle_model.indices.data(), (size_t)buffer_size);
 	vkUnmapMemory(this->device, staging_buffer_memory);
 
 	if (!helper::create_buffer(
@@ -1101,16 +1102,9 @@ bool VulkanRenderer::create_index_buffer()
 	return true;
 }
 
-bool VulkanRenderer::create_instance_buffer()
-{	
-	this->instances.resize(INSTANCE_COUNT);
-	for (size_t i = 0; i < INSTANCE_COUNT; ++i)
-	{
-		this->instances[i].color = glm::vec3((rand() % 255) / 255.0f, (rand() % 255) / 255.0f, (rand() % 255) / 255.0f);
-		this->instances[i].scale = 0.2f / (rand() % 3 + 1);
-	}
-
-	const VkDeviceSize buffer_size = sizeof(Instance) * INSTANCE_COUNT;
+bool VulkanRenderer::create_color_scale_buffer()
+{
+	const VkDeviceSize buffer_size = sizeof(color_scale) * INSTANCE_COUNT;
 
 	VkBuffer staging_buffer;
 	VkDeviceMemory staging_buffer_memory;
@@ -1129,7 +1123,7 @@ bool VulkanRenderer::create_instance_buffer()
 
 	void* data = nullptr;
 	vkMapMemory(this->device, staging_buffer_memory, 0, buffer_size, 0, &data);
-	memcpy(data, instances.data(), buffer_size);
+	memcpy(data, this->circles.colors_scale.data(), buffer_size);
 	vkUnmapMemory(this->device, staging_buffer_memory);
 
 	if (!helper::create_buffer(
@@ -1138,13 +1132,13 @@ bool VulkanRenderer::create_instance_buffer()
 		buffer_size,
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-		this->instance_buffer,
-		this->instance_buffer_memory))
+		this->color_scale_buffer,
+		this->color_scale_buffer_memory))
 	{
 		return false;
 	}
 
-	helper::copy_buffer(this->device, this->command_pool, this->graphics_queue, staging_buffer, this->instance_buffer, buffer_size);
+	helper::copy_buffer(this->device, this->command_pool, this->graphics_queue, staging_buffer, this->color_scale_buffer, buffer_size);
 
 	vkDestroyBuffer(this->device, staging_buffer, nullptr);
 	vkFreeMemory(this->device, staging_buffer_memory, nullptr);
@@ -1154,13 +1148,6 @@ bool VulkanRenderer::create_instance_buffer()
 
 bool VulkanRenderer::create_positions_buffer()
 {
-	auto positions = std::vector<glm::vec2>(INSTANCE_COUNT);
-
-	for (size_t i = 0; i < INSTANCE_COUNT; ++i)
-	{
-		positions[i] = glm::vec2((rand() % 400) / 200.0f * ((rand() % 2) * 2 - 1), (rand() % 200) / 200.0f * ((rand() % 2) * 2 - 1));
-	}
-
 	const VkDeviceSize buffer_size = sizeof(glm::vec2) * INSTANCE_COUNT;
 
 	if (!helper::create_buffer(
@@ -1177,7 +1164,7 @@ bool VulkanRenderer::create_positions_buffer()
 
 	void* data = nullptr;
 	vkMapMemory(this->device, this->positions_buffer_memory, 0, buffer_size, 0, &data);
-	memcpy(data, positions.data(), buffer_size);
+	memcpy(data, this->circles.positions.data(), buffer_size);
 	vkUnmapMemory(this->device, this->positions_buffer_memory);
 
 	return true;
@@ -1357,7 +1344,7 @@ bool VulkanRenderer::create_command_buffers()
 			vkCmdSetScissor(this->command_buffers[i], 0, 1, &this->scissor);
 
 			VkBuffer vertex_buffers[] = { this->vertex_buffer };
-			VkBuffer instance_buffers[] = { this->instance_buffer };
+			VkBuffer instance_buffers[] = { this->color_scale_buffer };
 			VkBuffer positions_buffers[] = { this->positions_buffer };
 			VkDeviceSize offsets[] = { 0 };
 
@@ -1366,13 +1353,13 @@ bool VulkanRenderer::create_command_buffers()
 
 			vkCmdBindVertexBuffers(this->command_buffers[i], VERTEX_BUFFER_BIND_ID, 1, vertex_buffers, offsets);
 
-			vkCmdBindVertexBuffers(this->command_buffers[i], INSTANCE_BUFFER_BIND_ID, 1, instance_buffers, offsets);
+			vkCmdBindVertexBuffers(this->command_buffers[i], COLOR_SCALE_BUFFER_BIND_ID, 1, instance_buffers, offsets);
 			
 			vkCmdBindVertexBuffers(this->command_buffers[i], POSITIONS_BUFFER_BIND_ID, 1, positions_buffers, offsets);
 
 			vkCmdBindIndexBuffer(this->command_buffers[i], this->index_buffer, 0, VK_INDEX_TYPE_UINT16);
 
-			vkCmdDrawIndexed(this->command_buffers[i], static_cast<uint32_t>(this->circle.indices.size()), INSTANCE_COUNT, 0, 0, 0);
+			vkCmdDrawIndexed(this->command_buffers[i], static_cast<uint32_t>(this->circle_model.indices.size()), INSTANCE_COUNT, 0, 0, 0);
 		}
 		vkCmdEndRenderPass(this->command_buffers[i]);
 
@@ -1501,21 +1488,26 @@ void VulkanRenderer::update(const uint32_t& current_image)
 	auto now = std::chrono::high_resolution_clock::now();
 
 	float time = std::chrono::duration<float, std::chrono::seconds::period>(now - start_time).count();
-
-	//for (size_t i = 0; i < this->instances.size(); ++i)
-	//	this->instances[i].pos = glm::vec2(i / 10.0f + cos(time) * 0.5f, i / 10.0f + sin(time) * 0.5f);
-
+	
 	void* data;
-	//vkMapMemory(this->device, this->instance_buffer_memory, 0, sizeof(Instance) * this->instances.size(), 0, &data);
-	//memcpy(data, &this->instances[0], sizeof(Instance) * this->instances.size());
-	//vkUnmapMemory(this->device, this->instance_buffer_memory);
+
+	this->circles.positions[0] = glm::vec2(0.0f, sin(time) * 2.0f);
+	this->circles.positions[1] = glm::vec2(cos(time) * 2.0f, sin(time) * 2.0f);
+	this->circles.positions[2] = glm::vec2(cos(time) * 2.0f, cos(time) * 2.0f);
+	this->circles.positions[3] = glm::vec2(cos(time) * 2.0f, 0.0f);
+	
+	const auto positions_update_size = sizeof(glm::vec2) * 4;
+
+	vkMapMemory(this->device, this->positions_buffer_memory, 0, positions_update_size, 0, &data);
+	memcpy(data, this->circles.positions.data(), positions_update_size);
+	vkUnmapMemory(this->device, this->positions_buffer_memory);
 
 	UniformBufferObject ubo = {};
 
 	ubo.view = glm::lookAt(glm::vec3(0.0f, 0.0f, +3.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 	ubo.proj = glm::perspective(glm::radians(60.0f), this->swap_chain_extent.width / (float)this->swap_chain_extent.height, 0.1f, 10.0f);
 	ubo.proj[1][1] *= -1;
-
+	
 	vkMapMemory(this->device, this->ubo_buffers_memory[current_image], 0, sizeof(ubo), 0, &data);
 	memcpy(data, &ubo, sizeof(ubo));
 	vkUnmapMemory(this->device, this->ubo_buffers_memory[current_image]);
@@ -1653,8 +1645,8 @@ bool VulkanRenderer::release()
 		vkDestroyBuffer(this->device, this->index_buffer, nullptr);
 		vkFreeMemory(this->device, this->index_buffer_memory, nullptr);
 
-		vkDestroyBuffer(this->device, this->instance_buffer, nullptr);
-		vkFreeMemory(this->device, this->instance_buffer_memory, nullptr);
+		vkDestroyBuffer(this->device, this->color_scale_buffer, nullptr);
+		vkFreeMemory(this->device, this->color_scale_buffer_memory, nullptr);
 
 		cleanup_swap_chain();
 
@@ -1694,4 +1686,16 @@ bool VulkanRenderer::release()
 void VulkanRenderer::window_resize()
 {
 	this->should_recreate_swapchain = true;
+}
+
+void VulkanRenderer::setup_circles()
+{
+	this->circles.resize(INSTANCE_COUNT);
+
+	for(size_t i = 0; i < INSTANCE_COUNT; ++i)
+	{
+		this->circles.positions[i] = glm::vec2((rand() % 400) / 200.0f * ((rand() % 2) * 2 - 1), (rand() % 200) / 200.0f * ((rand() % 2) * 2 - 1));;
+		this->circles.colors_scale[i].color = glm::vec3((rand() % 255) / 255.0f, (rand() % 255) / 255.0f, (rand() % 255) / 255.0f);
+		this->circles.colors_scale[i].scale = 0.2f / (rand() % 3 + 1);
+	}
 }

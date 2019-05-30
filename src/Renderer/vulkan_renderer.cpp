@@ -20,7 +20,7 @@ constexpr int INIT_HEIGHT = 720;
 #define POSITIONS_BUFFER_BIND_ID			2 // PER INSTANCE
 #define SCALE_BUFFER_BIND_ID				3 // PER INSTANCE
 
-#define INSTANCE_COUNT 1024
+#define INSTANCE_COUNT 512
 
 namespace helper
 {
@@ -285,6 +285,7 @@ bool VulkanRenderer::setup_window()
 	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 	this->window = glfwCreateWindow(INIT_WIDTH, INIT_HEIGHT, "Vulkan-Learn-1", nullptr, nullptr);
 	glfwSetFramebufferSizeCallback(this->window, resize_callback);
+	glfwSetWindowPos(this->window, 0, 50);
 	glfwSetWindowUserPointer(this->window, this);
 
 	return true;
@@ -1015,7 +1016,7 @@ bool VulkanRenderer::create_graphics_pipeline()
 
 bool VulkanRenderer::create_vertex_buffer()
 {
-	get_circle_model(15, &this->circle_model);
+	get_circle_model(30, &this->circle_model);
 	const VkDeviceSize buffer_size = sizeof(Vertex) * this->circle_model.vertices.size();
 
 	VkBuffer staging_buffer;
@@ -1440,13 +1441,13 @@ void VulkanRenderer::update(const uint32_t& current_image)
 
 	void* data;
 
-	std::set<uint32_t> collided = std::set<uint32_t>();
-
-
 	// Optimize : Think Data-Oriented
 	for (size_t i = 0; i < INSTANCE_COUNT; ++i)
 	{
-		this->circles.positions[i] += this->circles.velocities[i] * this->frame_timer * 1000.0f;
+		// Gravity Like
+		//this->circles.velocities[i].y += -0.0005f * this->frame_timer;
+
+		this->circles.positions[i] += this->circles.velocities[i] * this->frame_timer;
 
 		if (this->circles.positions[i].y - this->circles.scales[i] <= 0)
 		{
@@ -1494,14 +1495,13 @@ void VulkanRenderer::update(const uint32_t& current_image)
 				const auto m1 = this->circles.scales[i] * 5.0f;
 				const auto m2 = this->circles.scales[j] * 5.0f;
 				const auto p = 2 * (glm::dot(n, this->circles.velocities[i]) - glm::dot(n, this->circles.velocities[j])) / (m1 + m2);
-				this->circles.velocities[i] = this->circles.velocities[i] - n * m2 * p;
-				this->circles.velocities[j] = this->circles.velocities[j] + n * m1 * p;
+				this->circles.velocities[i] = (this->circles.velocities[i] - n * m2 * p);
+				this->circles.velocities[j] = (this->circles.velocities[j] + n * m1 * p);
 			}
 		}
 	}
 
-	const auto positions_update_size = sizeof(glm::vec2) * INSTANCE_COUNT;
-
+	static const auto positions_update_size = sizeof(glm::vec2) * INSTANCE_COUNT;
 	vkMapMemory(this->device, this->positions_buffer_memory, 0, positions_update_size, 0, &data);
 	memcpy(data, this->circles.positions.data(), positions_update_size);
 	vkUnmapMemory(this->device, this->positions_buffer_memory);
@@ -1620,7 +1620,7 @@ bool VulkanRenderer::main_loop()
 		const auto t_diff = std::chrono::duration<double, std::milli>(t_end - t_start).count();
 
 		this->frame_counter++;
-		this->frame_timer = (float)t_diff / 1000.0f;
+		this->frame_timer = (float)t_diff;
 
 		float fps_timer = std::chrono::duration<double, std::milli>(t_end - this->last_timestamp).count();
 
@@ -1811,10 +1811,13 @@ void VulkanRenderer::setup_circles()
 {
 	this->circles.resize(INSTANCE_COUNT);
 
+	const int max_size = glm::sqrt((INIT_WIDTH * INIT_HEIGHT) / INSTANCE_COUNT) / 4;
+	const int min_size = max_size / 3;
+
 	for (size_t i = 0; i < INSTANCE_COUNT; ++i)
 	{
-		this->circles.scales[i] = 5 + (rand() % 15);
-		this->circles.velocities[i] = glm::vec2(((rand() % 100) / 200.0f) * ((rand() % 2) * 2 - 1.0f), (rand() % 100) / 200.0f * ((rand() % 2) * 2 - 1.0f)) / glm::sqrt(this->circles.scales[i]);
+		this->circles.scales[i] = min_size + (rand() % (max_size - min_size));
+		this->circles.velocities[i] = glm::vec2(((rand() % 100) / 200.0f) * ((rand() % 2) * 2 - 1.0f), (rand() % 100) / 200.0f * ((rand() % 2) * 2 - 1.0f)) / glm::sqrt(this->circles.scales[i]) * 3.0f;
 		this->circles.positions[i] = glm::vec2(
 			this->circles.scales[i] + rand() % (INIT_WIDTH - 2 * static_cast<int>(this->circles.scales[i])),
 			this->circles.scales[i] + rand() % (INIT_HEIGHT - 2 * static_cast<int>(this->circles.scales[i])));

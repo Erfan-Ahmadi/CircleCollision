@@ -141,12 +141,12 @@
     <ClInclude Include="..\..\..\src\Renderer\vulkan_initializers.hpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\..\src\Renderer\shaders\shaders.frag" />
-    <None Include="..\..\..\src\Renderer\shaders\shaders.vert" />
-  </ItemGroup>
-  <ItemGroup>
     <ClCompile Include="..\..\..\src\circle_collision_simple\main.cpp" />
     <ClCompile Include="..\..\..\src\circle_collision_simple\circle_collision_simple.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\..\src\circle_collision_simple\shaders\shaders.frag" />
+    <None Include="..\..\..\src\circle_collision_simple\shaders\shaders.vert" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

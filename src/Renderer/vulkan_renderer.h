@@ -2,6 +2,7 @@
 
 #include "vulkan_initializers.hpp"
 #include "common.hpp"
+#include <chrono>
 
 #ifdef _WIN32
 #define VK_USE_PLATFORM_WIN32_KHR
@@ -87,12 +88,14 @@ struct UniformBufferObject
 struct circles_strcut
 {
 	std::vector<glm::vec2> positions;
+	std::vector<glm::vec2> velocities;
 	std::vector<glm::vec3> colors;
 	std::vector<float> scales; // = radius
 
 	inline void resize(const size_t& size)
 	{
 		positions.resize(size);
+		velocities.resize(size);
 		colors.resize(size);
 		scales.resize(size);
 	}
@@ -214,6 +217,11 @@ private:
 	std::vector<VkSemaphore> image_available_semaphore;
 	std::vector<VkSemaphore> render_finished_semaphore;
 	std::vector<VkFence> draw_fences;
+
+	std::chrono::time_point<std::chrono::high_resolution_clock> last_timestamp;
+	size_t frame_counter;
+	float frame_timer = 1.0f;
+	uint32_t last_fps = 0;
 
 	size_t num_frames;
 	size_t current_frame = 0;

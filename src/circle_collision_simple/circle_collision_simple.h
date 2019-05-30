@@ -1,7 +1,7 @@
 #pragma once
 
-#include "vulkan_initializers.hpp"
-#include "common.hpp"
+#include "Renderer/vulkan_initializers.hpp"
+#include "Renderer/common.hpp"
 #include <chrono>
 
 #ifdef _WIN32
@@ -15,12 +15,6 @@
 #define GLM_FORCE_RADIANS
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
-
-// end-user
-namespace renderer
-{
-
-};
 
 #include <optional>
 
@@ -101,7 +95,7 @@ struct circles_strcut
 	}
 };
  
-struct VulkanRenderer
+struct CircleCollisionSimple
 {
 public:
 	void initialize();
@@ -129,10 +123,10 @@ private:
 	bool create_renderpass();
 	bool create_descriptor_set_layout();
 	bool create_graphics_pipeline();
-	bool create_vertex_buffer();
-	bool create_index_buffer();
-	bool create_instance_buffers();
-	bool create_uniform_buffers();
+	bool create_vertex_buffer(); //
+	bool create_index_buffer(); //
+	bool create_instance_buffers(); //
+	bool create_uniform_buffers(); //
 	bool create_descriptor_pool();
 	bool create_descriptor_sets();
 	bool create_frame_buffers();
@@ -140,9 +134,9 @@ private:
 	bool create_command_buffers();
 	bool create_sync_objects();
 	
-	bool create_colors_buffer();
-	bool create_positions_buffer();
-	bool create_scales_buffer();
+	bool create_colors_buffer(); //
+	bool create_positions_buffer(); //
+	bool create_scales_buffer(); // 
 
 	bool cleanup_swap_chain();
 	bool recreate_swap_chain();
@@ -155,6 +149,7 @@ private:
 	bool main_loop();
 	
 	// Sample ----------------
+	
 	model circle_model;
 
 	void setup_circles();
@@ -184,6 +179,10 @@ private:
 
 	VkPipelineLayout pipeline_layout;
 	VkPipeline graphics_pipeline;
+	
+	VkCommandPool command_pool;
+	std::vector<VkCommandBuffer> command_buffers;
+
 	// Sample ----------------
 
 
@@ -210,9 +209,6 @@ private:
 
 	VkViewport viewport;
 	VkRect2D scissor;
-
-	VkCommandPool command_pool;
-	std::vector<VkCommandBuffer> command_buffers;
 
 	std::vector<VkSemaphore> image_available_semaphore;
 	std::vector<VkSemaphore> render_finished_semaphore;

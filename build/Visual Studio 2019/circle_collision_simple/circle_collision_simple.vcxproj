@@ -136,17 +136,17 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\src\main.cpp" />
-    <ClCompile Include="..\..\..\src\Renderer\vulkan_renderer.cpp" />
-  </ItemGroup>
-  <ItemGroup>
+    <ClInclude Include="..\..\..\src\circle_collision_simple\circle_collision_simple.h" />
     <ClInclude Include="..\..\..\src\Renderer\common.hpp" />
     <ClInclude Include="..\..\..\src\Renderer\vulkan_initializers.hpp" />
-    <ClInclude Include="..\..\..\src\Renderer\vulkan_renderer.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\src\Renderer\shaders\shaders.frag" />
     <None Include="..\..\..\src\Renderer\shaders\shaders.vert" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\..\src\circle_collision_simple\main.cpp" />
+    <ClCompile Include="..\..\..\src\circle_collision_simple\circle_collision_simple.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

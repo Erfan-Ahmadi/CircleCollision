@@ -20,7 +20,7 @@ constexpr int INIT_HEIGHT = 720;
 #define POSITIONS_BUFFER_BIND_ID			2 // PER INSTANCE
 #define SCALE_BUFFER_BIND_ID				3 // PER INSTANCE
 
-#define INSTANCE_COUNT 16
+#define INSTANCE_COUNT 1024
 
 namespace helper
 {
@@ -1442,6 +1442,7 @@ void VulkanRenderer::update(const uint32_t& current_image)
 
 	std::set<uint32_t> collided = std::set<uint32_t>();
 
+
 	// Optimize : Think Data-Oriented
 	for (size_t i = 0; i < INSTANCE_COUNT; ++i)
 	{
@@ -1469,9 +1470,11 @@ void VulkanRenderer::update(const uint32_t& current_image)
 			this->circles.velocities[i].x *= -1;
 		}
 
-		/*
-		for (size_t j = i + 1; j < INSTANCE_COUNT; ++j)
+		for (size_t j = 0; j < INSTANCE_COUNT; ++j)
 		{
+			if (i == j)
+				continue;
+
 			const auto dx = this->circles.positions[i].x - this->circles.positions[j].x;
 			const auto dy = this->circles.positions[i].y - this->circles.positions[j].y;
 			const auto dis2 = (dy * dy + dx * dx);
@@ -1479,13 +1482,22 @@ void VulkanRenderer::update(const uint32_t& current_image)
 
 			if (dis2 < radii * radii)
 			{
-				//this->circles.colors[i] = glm::vec3(1.0f, 0.0f, 0.0f);
-				//this->circles.colors[j] = glm::vec3(1.0f, 0.0f, 0.0f);
-				collided.emplace(i);
-				collided.emplace(j);
+				// Move Away
+				const auto dis = glm::sqrt(dis2);
+				const auto n = glm::vec2(dx / dis, dy / dis);
+				const auto covered = radii - dis;
+				const auto move_vec = n * (covered / 2.0f);
+				this->circles.positions[i] += move_vec;
+				this->circles.positions[j] -= move_vec;
+
+				// Change Velocity Direction
+				const auto m1 = this->circles.scales[i] * 5.0f;
+				const auto m2 = this->circles.scales[j] * 5.0f;
+				const auto p = 2 * (glm::dot(n, this->circles.velocities[i]) - glm::dot(n, this->circles.velocities[j])) / (m1 + m2);
+				this->circles.velocities[i] = this->circles.velocities[i] - n * m2 * p;
+				this->circles.velocities[j] = this->circles.velocities[j] + n * m1 * p;
 			}
 		}
-		*/
 	}
 
 	const auto positions_update_size = sizeof(glm::vec2) * INSTANCE_COUNT;
@@ -1616,7 +1628,7 @@ bool VulkanRenderer::main_loop()
 		{
 			this->last_fps = static_cast<uint32_t>((float)frame_counter * (1000.0f / fps_timer));
 
-			sprintf_s(title, "%d FPS", this->last_fps);
+			sprintf_s(title, "%d FPS in %.8f (ms)", this->last_fps, this->frame_timer);
 
 			glfwSetWindowTitle(this->window, title);
 
@@ -1801,8 +1813,8 @@ void VulkanRenderer::setup_circles()
 
 	for (size_t i = 0; i < INSTANCE_COUNT; ++i)
 	{
-		this->circles.scales[i] = 15 + (rand() % 30);
-		this->circles.velocities[i] = glm::vec2(((rand() % 100) / 200.0f) * ((rand() % 2) * 2 - 1.0f), (rand() % 100) / 200.0f * ((rand() % 2) * 2 - 1.0f));
+		this->circles.scales[i] = 5 + (rand() % 15);
+		this->circles.velocities[i] = glm::vec2(((rand() % 100) / 200.0f) * ((rand() % 2) * 2 - 1.0f), (rand() % 100) / 200.0f * ((rand() % 2) * 2 - 1.0f)) / glm::sqrt(this->circles.scales[i]);
 		this->circles.positions[i] = glm::vec2(
 			this->circles.scales[i] + rand() % (INIT_WIDTH - 2 * static_cast<int>(this->circles.scales[i])),
 			this->circles.scales[i] + rand() % (INIT_HEIGHT - 2 * static_cast<int>(this->circles.scales[i])));

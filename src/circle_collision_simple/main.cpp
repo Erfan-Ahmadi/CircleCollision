@@ -1,8 +1,8 @@
-#include "Renderer\vulkan_renderer.h"
+#include "circle_collision_simple.h"
 
 int main()
 {
-	VulkanRenderer app;
+	CircleCollisionSimple app;
 
 	app.initialize();
 

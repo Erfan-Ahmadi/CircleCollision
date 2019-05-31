@@ -1,11 +1,11 @@
-#include "vulkan_renderer.h"
+#include "circle_collision_simple.h"
 
 #include <set>
 #include <fstream>
 #include <algorithm>
 #include <stdio.h>
 
-#include "vulkan_initializers.hpp"
+#include "Renderer/vulkan_initializers.hpp"
 
 #ifdef _WIN32
 #include <direct.h>
@@ -217,7 +217,7 @@ const std::vector<const char*> device_extensions = {
 
 static void resize_callback(GLFWwindow* window, int width, int height)
 {
-	auto app = reinterpret_cast<VulkanRenderer*>(glfwGetWindowUserPointer(window));
+	auto app = reinterpret_cast<CircleCollisionSimple*>(glfwGetWindowUserPointer(window));
 	app->window_resize();
 }
 
@@ -251,7 +251,7 @@ static std::vector<char> read_file(const std::string& fileName)
 	return buffer;
 }
 
-void VulkanRenderer::initialize()
+void CircleCollisionSimple::initialize()
 {
 	srand(time(NULL));
 	validation_layers_enabled = false;
@@ -261,7 +261,7 @@ void VulkanRenderer::initialize()
 	this->app_path = std::string(current_path);
 }
 
-bool VulkanRenderer::run()
+bool CircleCollisionSimple::run()
 {
 	if (!setup_window())
 		return false;
@@ -278,7 +278,7 @@ bool VulkanRenderer::run()
 	return true;
 }
 
-bool VulkanRenderer::setup_window()
+bool CircleCollisionSimple::setup_window()
 {
 	glfwInit();
 
@@ -292,7 +292,7 @@ bool VulkanRenderer::setup_window()
 	return true;
 }
 
-bool VulkanRenderer::setup_vulkan()
+bool CircleCollisionSimple::setup_vulkan()
 {
 	if (!create_instance())
 		return false;
@@ -340,7 +340,7 @@ bool VulkanRenderer::setup_vulkan()
 	return true;
 }
 
-bool VulkanRenderer::create_instance()
+bool CircleCollisionSimple::create_instance()
 {
 	VkApplicationInfo app_info = {};
 	app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -460,7 +460,7 @@ bool VulkanRenderer::create_instance()
 	return result == VK_SUCCESS;
 }
 
-bool VulkanRenderer::set_up_debug_messenger()
+bool CircleCollisionSimple::set_up_debug_messenger()
 {
 #if defined(_DEBUG)
 	if (!validation_layers_enabled)
@@ -498,7 +498,7 @@ bool VulkanRenderer::set_up_debug_messenger()
 #endif
 }
 
-bool VulkanRenderer::pick_physical_device()
+bool CircleCollisionSimple::pick_physical_device()
 {
 	uint32_t available_physical_devices_count = 0;
 	vkEnumeratePhysicalDevices(this->instance, &available_physical_devices_count, nullptr);
@@ -541,7 +541,7 @@ bool VulkanRenderer::pick_physical_device()
 	return true;
 }
 
-bool VulkanRenderer::check_device_extensions_support()
+bool CircleCollisionSimple::check_device_extensions_support()
 {
 	uint32_t available_extensions_count;
 	vkEnumerateDeviceExtensionProperties(this->physical_device, nullptr, &available_extensions_count, nullptr);
@@ -556,7 +556,7 @@ bool VulkanRenderer::check_device_extensions_support()
 	return required_extensions.empty();
 }
 
-bool VulkanRenderer::create_logical_device()
+bool CircleCollisionSimple::create_logical_device()
 {
 	if (!check_device_extensions_support())
 		return false;
@@ -607,12 +607,12 @@ bool VulkanRenderer::create_logical_device()
 	return result == VK_SUCCESS;
 }
 
-bool VulkanRenderer::create_surface()
+bool CircleCollisionSimple::create_surface()
 {
 	return glfwCreateWindowSurface(this->instance, this->window, nullptr, &this->surface) == VK_SUCCESS;
 }
 
-bool VulkanRenderer::create_swap_chain()
+bool CircleCollisionSimple::create_swap_chain()
 {
 	// Get Properties
 
@@ -746,7 +746,7 @@ bool VulkanRenderer::create_swap_chain()
 	return true;
 }
 
-bool VulkanRenderer::create_image_views()
+bool CircleCollisionSimple::create_image_views()
 {
 	this->swap_chain_image_views.resize(this->swap_chain_images.size());
 
@@ -774,7 +774,7 @@ bool VulkanRenderer::create_image_views()
 	return true;
 }
 
-bool VulkanRenderer::create_renderpass()
+bool CircleCollisionSimple::create_renderpass()
 {
 	// Graphics Subpass
 	VkAttachmentReference color_attach_ref = {};
@@ -824,7 +824,7 @@ bool VulkanRenderer::create_renderpass()
 	return true;
 }
 
-bool VulkanRenderer::create_descriptor_set_layout()
+bool CircleCollisionSimple::create_descriptor_set_layout()
 {
 	VkDescriptorSetLayoutBinding descriptor_set_binding = {};
 	descriptor_set_binding.binding = 0;
@@ -844,10 +844,10 @@ bool VulkanRenderer::create_descriptor_set_layout()
 	return true;
 }
 
-bool VulkanRenderer::create_graphics_pipeline()
+bool CircleCollisionSimple::create_graphics_pipeline()
 {
-	auto vert_shader = read_file(this->app_path + "\\..\\..\\..\\src\\Renderer\\shaders\\shaders.vert.spv");
-	auto frag_shader = read_file(this->app_path + "\\..\\..\\..\\src\\Renderer\\shaders\\shaders.frag.spv");
+	auto vert_shader = read_file(this->app_path + "\\..\\..\\..\\src\\circle_collision_simple\\shaders\\shaders.vert.spv");
+	auto frag_shader = read_file(this->app_path + "\\..\\..\\..\\src\\circle_collision_simple\\shaders\\shaders.frag.spv");
 
 	if (vert_shader.empty() || frag_shader.empty())
 	{
@@ -1015,7 +1015,7 @@ bool VulkanRenderer::create_graphics_pipeline()
 	return true;
 }
 
-bool VulkanRenderer::create_vertex_buffer()
+bool CircleCollisionSimple::create_vertex_buffer()
 {
 	get_circle_model(30, &this->circle_model);
 	const VkDeviceSize buffer_size = sizeof(Vertex) * this->circle_model.vertices.size();
@@ -1060,7 +1060,7 @@ bool VulkanRenderer::create_vertex_buffer()
 	return true;
 }
 
-bool VulkanRenderer::create_index_buffer()
+bool CircleCollisionSimple::create_index_buffer()
 {
 	const VkDeviceSize buffer_size = sizeof(uint16_t) * this->circle_model.indices.size();
 
@@ -1104,7 +1104,7 @@ bool VulkanRenderer::create_index_buffer()
 	return true;
 }
 
-bool VulkanRenderer::create_instance_buffers()
+bool CircleCollisionSimple::create_instance_buffers()
 {
 	setup_circles();
 
@@ -1118,7 +1118,7 @@ bool VulkanRenderer::create_instance_buffers()
 	return true;
 }
 
-bool VulkanRenderer::create_uniform_buffers()
+bool CircleCollisionSimple::create_uniform_buffers()
 {
 	const auto buffer_size = sizeof(UniformBufferObject);
 
@@ -1144,7 +1144,7 @@ bool VulkanRenderer::create_uniform_buffers()
 	return true;
 }
 
-bool VulkanRenderer::create_descriptor_pool()
+bool CircleCollisionSimple::create_descriptor_pool()
 {
 	VkDescriptorPoolSize pool_size = {};
 	pool_size.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -1164,7 +1164,7 @@ bool VulkanRenderer::create_descriptor_pool()
 	return true;
 }
 
-bool VulkanRenderer::create_descriptor_sets()
+bool CircleCollisionSimple::create_descriptor_sets()
 {
 	std::vector<VkDescriptorSetLayout> layouts(swap_chain_images.size(), ubo_descriptor_set_layout);
 
@@ -1199,7 +1199,7 @@ bool VulkanRenderer::create_descriptor_sets()
 	}
 }
 
-bool VulkanRenderer::create_frame_buffers()
+bool CircleCollisionSimple::create_frame_buffers()
 {
 	this->swap_chain_frame_buffers.resize(this->swap_chain_image_views.size());
 
@@ -1229,7 +1229,7 @@ bool VulkanRenderer::create_frame_buffers()
 	return true;
 }
 
-bool VulkanRenderer::create_command_pool()
+bool CircleCollisionSimple::create_command_pool()
 {
 	VkCommandPoolCreateInfo create_info = {};
 
@@ -1246,7 +1246,7 @@ bool VulkanRenderer::create_command_pool()
 	return true;
 }
 
-bool VulkanRenderer::create_command_buffers()
+bool CircleCollisionSimple::create_command_buffers()
 {
 	this->command_buffers.resize(this->swap_chain_frame_buffers.size());
 
@@ -1324,7 +1324,7 @@ bool VulkanRenderer::create_command_buffers()
 	return true;
 }
 
-bool VulkanRenderer::create_sync_objects()
+bool CircleCollisionSimple::create_sync_objects()
 {
 	this->num_frames = this->swap_chain_images.size();
 
@@ -1354,7 +1354,7 @@ bool VulkanRenderer::create_sync_objects()
 	return true;
 }
 
-bool VulkanRenderer::cleanup_swap_chain()
+bool CircleCollisionSimple::cleanup_swap_chain()
 {
 	for (auto& frame_buffer : this->swap_chain_frame_buffers)
 		vkDestroyFramebuffer(this->device, frame_buffer, nullptr);
@@ -1379,7 +1379,7 @@ bool VulkanRenderer::cleanup_swap_chain()
 	return true;
 }
 
-bool VulkanRenderer::recreate_swap_chain()
+bool CircleCollisionSimple::recreate_swap_chain()
 {
 	vkDeviceWaitIdle(this->device);
 
@@ -1415,7 +1415,7 @@ bool VulkanRenderer::recreate_swap_chain()
 	return true;
 }
 
-bool VulkanRenderer::set_viewport_scissor()
+bool CircleCollisionSimple::set_viewport_scissor()
 {
 	this->viewport = {};
 	viewport.x = 0.0f;
@@ -1432,7 +1432,7 @@ bool VulkanRenderer::set_viewport_scissor()
 	return true;
 }
 
-void VulkanRenderer::update(const uint32_t& current_image)
+void CircleCollisionSimple::update(const uint32_t& current_image)
 {
 	static auto start_time = std::chrono::high_resolution_clock::now();
 
@@ -1519,7 +1519,7 @@ void VulkanRenderer::update(const uint32_t& current_image)
 
 char title[64];
 
-bool VulkanRenderer::draw_frame()
+bool CircleCollisionSimple::draw_frame()
 {
 	vkWaitForFences(this->device, 1, &this->draw_fences[this->current_frame], VK_TRUE, std::numeric_limits<uint64_t>::max());
 
@@ -1605,7 +1605,7 @@ bool VulkanRenderer::draw_frame()
 	return true;
 }
 
-bool VulkanRenderer::main_loop()
+bool CircleCollisionSimple::main_loop()
 {
 	this->last_timestamp = std::chrono::high_resolution_clock::now();
 
@@ -1642,7 +1642,7 @@ bool VulkanRenderer::main_loop()
 	return true;
 }
 
-bool VulkanRenderer::release()
+bool CircleCollisionSimple::release()
 {
 	if (is_released)
 		return true;
@@ -1710,12 +1710,12 @@ bool VulkanRenderer::release()
 	return true;
 }
 
-void VulkanRenderer::window_resize()
+void CircleCollisionSimple::window_resize()
 {
 	this->should_recreate_swapchain = true;
 }
 
-bool VulkanRenderer::create_colors_buffer()
+bool CircleCollisionSimple::create_colors_buffer()
 {
 	const VkDeviceSize buffer_size = sizeof(glm::vec3) * INSTANCE_COUNT;
 
@@ -1739,7 +1739,7 @@ bool VulkanRenderer::create_colors_buffer()
 	return true;
 }
 
-bool VulkanRenderer::create_positions_buffer()
+bool CircleCollisionSimple::create_positions_buffer()
 {
 	const VkDeviceSize buffer_size = sizeof(glm::vec2) * INSTANCE_COUNT;
 
@@ -1763,7 +1763,7 @@ bool VulkanRenderer::create_positions_buffer()
 	return true;
 }
 
-bool VulkanRenderer::create_scales_buffer()
+bool CircleCollisionSimple::create_scales_buffer()
 {
 	const VkDeviceSize buffer_size = sizeof(float) * INSTANCE_COUNT;
 
@@ -1807,7 +1807,7 @@ bool VulkanRenderer::create_scales_buffer()
 	return true;
 }
 
-void VulkanRenderer::setup_circles()
+void CircleCollisionSimple::setup_circles()
 {
 	this->circles.resize(INSTANCE_COUNT);
 

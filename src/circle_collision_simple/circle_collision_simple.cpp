@@ -20,8 +20,16 @@ constexpr int INIT_HEIGHT = 720;
 #define POSITIONS_BUFFER_BIND_ID			2 // PER INSTANCE
 #define SCALE_BUFFER_BIND_ID				3 // PER INSTANCE
 
-#define INSTANCE_COUNT (1 << 12)
-#define RELATIVE_VEL 1.0f
+constexpr uint64_t	instance_count		= (1 << 10);
+constexpr float		relative_velocity	= 0.1f;
+constexpr float		relative_scale		= 1.0f;
+
+constexpr bool mouse_bounding_enabled	= false;
+constexpr bool mouse_drawing_enabled	= true;
+
+float mouse_draw_radius = 30.0f;
+
+char title[64];
 
 namespace helper
 {
@@ -215,6 +223,14 @@ const std::vector<const char*> device_extensions = {
 	VK_KHR_SWAPCHAIN_EXTENSION_NAME
 };
 
+void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
+{
+	mouse_draw_radius += yoffset;
+
+	if (mouse_draw_radius < 1)
+		mouse_draw_radius = 1;
+}
+
 static void resize_callback(GLFWwindow* window, int width, int height)
 {
 	auto app = reinterpret_cast<CircleCollisionSimple*>(glfwGetWindowUserPointer(window));
@@ -285,6 +301,7 @@ bool CircleCollisionSimple::setup_window()
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 	this->window = glfwCreateWindow(INIT_WIDTH, INIT_HEIGHT, "Vulkan-Learn-1", nullptr, nullptr);
+	glfwSetScrollCallback(window, scroll_callback);
 	glfwSetFramebufferSizeCallback(this->window, resize_callback);
 	glfwSetWindowPos(this->window, 0, 50);
 	glfwSetWindowUserPointer(this->window, this);
@@ -1310,7 +1327,7 @@ bool CircleCollisionSimple::create_command_buffers()
 
 			vkCmdBindIndexBuffer(this->command_buffers[i], this->index_buffer, 0, VK_INDEX_TYPE_UINT16);
 
-			vkCmdDrawIndexed(this->command_buffers[i], static_cast<uint32_t>(this->circle_model.indices.size()), INSTANCE_COUNT, 0, 0, 0);
+			vkCmdDrawIndexed(this->command_buffers[i], static_cast<uint32_t>(this->circle_model.indices.size()), instance_count, 0, 0, 0);
 		}
 		vkCmdEndRenderPass(this->command_buffers[i]);
 
@@ -1442,10 +1459,30 @@ void CircleCollisionSimple::update(const uint32_t& current_image)
 
 	void* data;
 
-	// Optimize : Think Data-Oriented
-	for (size_t i = 0; i < INSTANCE_COUNT; ++i)
+	bool draw = false;
+
+	int mouse_state = glfwGetMouseButton(this->window, GLFW_MOUSE_BUTTON_LEFT);
+
+	glm::vec2 mouse_pos;
+
+	if (mouse_state == GLFW_PRESS)
 	{
-		// Gravity Like
+		draw = true;
+		double xpos, ypos;
+		glfwGetCursorPos(window, &xpos, &ypos);
+		mouse_pos = glm::vec2(xpos, INIT_HEIGHT - ypos);
+	}
+
+	const auto right_wall = (mouse_bounding_enabled && draw) ? mouse_pos.x : INIT_WIDTH;
+	const auto bottom_wall =  (mouse_bounding_enabled && draw) ? mouse_pos.y : INIT_HEIGHT;
+
+	// Optimize : Think Data-Oriented
+	for (size_t i = 0; i < instance_count; ++i)
+	{
+		if (draw && glm::distance(this->circles.positions[i], mouse_pos) < mouse_draw_radius)
+		{
+			this->circles.velocities[i] = (mouse_pos - this->circles.positions[i]) * 10e-4f;
+		}
 
 		this->circles.positions[i] += this->circles.velocities[i] * this->frame_timer;
 
@@ -1454,9 +1491,9 @@ void CircleCollisionSimple::update(const uint32_t& current_image)
 			this->circles.positions[i].y = this->circles.scales[i];
 			this->circles.velocities[i].y *= -1;
 		}
-		else if (this->circles.positions[i].y + this->circles.scales[i] >= INIT_HEIGHT)
+		else if (this->circles.positions[i].y + this->circles.scales[i] >= bottom_wall)
 		{
-			this->circles.positions[i].y = INIT_HEIGHT - this->circles.scales[i];
+			this->circles.positions[i].y = bottom_wall - this->circles.scales[i];
 			this->circles.velocities[i].y *= -1;
 		}
 
@@ -1465,13 +1502,13 @@ void CircleCollisionSimple::update(const uint32_t& current_image)
 			this->circles.positions[i].x = this->circles.scales[i];
 			this->circles.velocities[i].x *= -1;
 		}
-		else if (this->circles.positions[i].x + this->circles.scales[i] >= INIT_WIDTH)
+		else if (this->circles.positions[i].x + this->circles.scales[i] >= right_wall)
 		{
-			this->circles.positions[i].x = INIT_WIDTH - this->circles.scales[i];
+			this->circles.positions[i].x = right_wall - this->circles.scales[i];
 			this->circles.velocities[i].x *= -1;
 		}
 
-		for (size_t j = 0; j < INSTANCE_COUNT; ++j)
+		for (size_t j = 0; j < instance_count; ++j)
 		{
 			if (i == j)
 				continue;
@@ -1499,9 +1536,31 @@ void CircleCollisionSimple::update(const uint32_t& current_image)
 				this->circles.velocities[j] = (this->circles.velocities[j] + n * m1 * p);
 			}
 		}
+
+		// Check Collision With Mouse
+		if (mouse_drawing_enabled && draw)
+		{
+			const float dx = this->circles.positions[i].x - mouse_pos.x;
+			const float dy = this->circles.positions[i].y - mouse_pos.y;
+			const auto dis2 = (dy * dy + dx * dx);
+			const auto radii = this->circles.scales[i] + mouse_draw_radius;
+
+			if (dis2 < radii * radii)
+			{
+				// Move Away
+				const auto dis = glm::sqrt(dis2);
+				const auto n = glm::vec2(dx / dis, dy / dis);
+				const auto covered = radii - dis;
+				const auto move_vec = n * (covered);
+				this->circles.positions[i] += move_vec;
+			}
+		}
 	}
 
-	static const auto positions_update_size = sizeof(glm::vec2) * INSTANCE_COUNT;
+	if (draw)
+		draw = false;
+
+	static const auto positions_update_size = sizeof(glm::vec2) * instance_count;
 	vkMapMemory(this->device, this->positions_buffer_memory, 0, positions_update_size, 0, &data);
 	memcpy(data, this->circles.positions.data(), positions_update_size);
 	vkUnmapMemory(this->device, this->positions_buffer_memory);
@@ -1516,8 +1575,6 @@ void CircleCollisionSimple::update(const uint32_t& current_image)
 	memcpy(data, &ubo, sizeof(ubo));
 	vkUnmapMemory(this->device, this->ubo_buffers_memory[current_image]);
 }
-
-char title[64];
 
 bool CircleCollisionSimple::draw_frame()
 {
@@ -1717,7 +1774,7 @@ void CircleCollisionSimple::window_resize()
 
 bool CircleCollisionSimple::create_colors_buffer()
 {
-	const VkDeviceSize buffer_size = sizeof(glm::vec3) * INSTANCE_COUNT;
+	const VkDeviceSize buffer_size = sizeof(glm::vec3) * instance_count;
 
 	if (!helper::create_buffer(
 		this->device,
@@ -1741,7 +1798,7 @@ bool CircleCollisionSimple::create_colors_buffer()
 
 bool CircleCollisionSimple::create_positions_buffer()
 {
-	const VkDeviceSize buffer_size = sizeof(glm::vec2) * INSTANCE_COUNT;
+	const VkDeviceSize buffer_size = sizeof(glm::vec2) * instance_count;
 
 	if (!helper::create_buffer(
 		this->device,
@@ -1765,7 +1822,7 @@ bool CircleCollisionSimple::create_positions_buffer()
 
 bool CircleCollisionSimple::create_scales_buffer()
 {
-	const VkDeviceSize buffer_size = sizeof(float) * INSTANCE_COUNT;
+	const VkDeviceSize buffer_size = sizeof(float) * instance_count;
 
 	VkBuffer staging_buffer;
 	VkDeviceMemory staging_buffer_memory;
@@ -1809,15 +1866,15 @@ bool CircleCollisionSimple::create_scales_buffer()
 
 void CircleCollisionSimple::setup_circles()
 {
-	this->circles.resize(INSTANCE_COUNT);
+	this->circles.resize(instance_count);
 
-	const int max_size = glm::sqrt((INIT_WIDTH * INIT_HEIGHT) / INSTANCE_COUNT) * 0.5f;
+	const int max_size = relative_scale * glm::sqrt((INIT_WIDTH * INIT_HEIGHT) / instance_count) * 0.5f;
 	const int min_size = max_size / 3;
 
-	for (size_t i = 0; i < INSTANCE_COUNT; ++i)
+	for (size_t i = 0; i < instance_count; ++i)
 	{
 		this->circles.scales[i] = min_size + (rand() % (max_size - min_size));
-		this->circles.velocities[i] = glm::vec2(((rand() % 100) / 200.0f) * ((rand() % 2) * 2 - 1.0f), (rand() % 100) / 200.0f * ((rand() % 2) * 2 - 1.0f)) / glm::sqrt(this->circles.scales[i]) * 3.0f;
+		this->circles.velocities[i] = relative_velocity * glm::vec2(((rand() % 100) / 200.0f) * ((rand() % 2) * 2 - 1.0f), (rand() % 100) / 200.0f * ((rand() % 2) * 2 - 1.0f)) / glm::sqrt(this->circles.scales[i]) * 3.0f;
 		this->circles.positions[i] = glm::vec2(
 			this->circles.scales[i] + rand() % (INIT_WIDTH - 2 * static_cast<int>(this->circles.scales[i])),
 			this->circles.scales[i] + rand() % (INIT_HEIGHT - 2 * static_cast<int>(this->circles.scales[i])));

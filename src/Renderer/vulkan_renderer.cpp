@@ -20,7 +20,8 @@ constexpr int INIT_HEIGHT = 720;
 #define POSITIONS_BUFFER_BIND_ID			2 // PER INSTANCE
 #define SCALE_BUFFER_BIND_ID				3 // PER INSTANCE
 
-#define INSTANCE_COUNT 512
+#define INSTANCE_COUNT (1 << 12)
+#define RELATIVE_VEL 1.0f
 
 namespace helper
 {
@@ -1277,7 +1278,7 @@ bool VulkanRenderer::create_command_buffers()
 		VkRenderPassBeginInfo render_pass_begin_info = {};
 		render_pass_begin_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 		render_pass_begin_info.clearValueCount = 1;
-		VkClearValue clear_color = { 0.0f, 0.0f, 0.0f, 1.0f };
+		VkClearValue clear_color = { 0.01f, 0.01f, 0.01f, 1.0f };
 		render_pass_begin_info.pClearValues = &clear_color;
 		render_pass_begin_info.renderPass = this->render_pass;
 		render_pass_begin_info.framebuffer = this->swap_chain_frame_buffers[i];
@@ -1445,7 +1446,6 @@ void VulkanRenderer::update(const uint32_t& current_image)
 	for (size_t i = 0; i < INSTANCE_COUNT; ++i)
 	{
 		// Gravity Like
-		//this->circles.velocities[i].y += -0.0005f * this->frame_timer;
 
 		this->circles.positions[i] += this->circles.velocities[i] * this->frame_timer;
 
@@ -1811,7 +1811,7 @@ void VulkanRenderer::setup_circles()
 {
 	this->circles.resize(INSTANCE_COUNT);
 
-	const int max_size = glm::sqrt((INIT_WIDTH * INIT_HEIGHT) / INSTANCE_COUNT) / 4;
+	const int max_size = glm::sqrt((INIT_WIDTH * INIT_HEIGHT) / INSTANCE_COUNT) * 0.5f;
 	const int min_size = max_size / 3;
 
 	for (size_t i = 0; i < INSTANCE_COUNT; ++i)

@@ -1,4 +1,4 @@
-#include "circle_collision_simple.h"
+#include "circle_collision_compute_shader.h"
 
 #include <set>
 #include <fstream>
@@ -20,12 +20,12 @@ constexpr int INIT_HEIGHT = 720;
 #define POSITIONS_BUFFER_BIND_ID			2 // PER INSTANCE
 #define SCALE_BUFFER_BIND_ID				3 // PER INSTANCE
 
-constexpr uint64_t	instance_count		= (1 << 10);
-constexpr float		relative_velocity	= 0.1f;
-constexpr float		relative_scale		= 1.0f;
+constexpr uint64_t	instance_count = (1 << 10);
+constexpr float		relative_velocity = 0.1f;
+constexpr float		relative_scale = 1.0f;
 
-constexpr bool mouse_bounding_enabled	= false;
-constexpr bool mouse_drawing_enabled	= true;
+constexpr bool mouse_bounding_enabled = false;
+constexpr bool mouse_drawing_enabled = true;
 
 float mouse_draw_radius = 30.0f;
 
@@ -33,15 +33,49 @@ char title[64];
 
 namespace helper
 {
+	void print_queue_flags(const int& index, const VkQueueFlags& queue_flags)
+	{
+		std::cout << "Queue Index " << index << " :" << std::endl;
+
+		if (queue_flags & VK_QUEUE_GRAPHICS_BIT)
+			std::cout << "\tVK_QUEUE_GRAPHICS_BIT" << std::endl;
+		if (queue_flags & VK_QUEUE_COMPUTE_BIT)
+			std::cout << "\tVK_QUEUE_COMPUTE_BIT" << std::endl;
+		if (queue_flags & VK_QUEUE_TRANSFER_BIT)
+			std::cout << "\tVK_QUEUE_TRANSFER_BIT" << std::endl;
+		if (queue_flags & VK_QUEUE_SPARSE_BINDING_BIT)
+			std::cout << "\tVK_QUEUE_SPARSE_BINDING_BIT" << std::endl;
+		if (queue_flags & VK_QUEUE_PROTECTED_BIT)
+			std::cout << "\tVK_QUEUE_PROTECTED_BIT" << std::endl;
+	}
+
 	QueueFamilyIndices find_queue_family_indices(const VkPhysicalDevice& physical_device, const VkSurfaceKHR& surface)
 	{
 		QueueFamilyIndices indices;
 
-		uint32_t queueFamilyCount = 0;
-		vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &queueFamilyCount, nullptr);
+		uint32_t queue_family_count = 0;
+		vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &queue_family_count, nullptr);
 
-		std::vector<VkQueueFamilyProperties> queue_families(queueFamilyCount);
-		vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &queueFamilyCount, queue_families.data());
+		std::cout << "\n\nQueue Families Count = " << queue_family_count << std::endl;
+
+		std::vector<VkQueueFamilyProperties> queue_families(queue_family_count);
+		vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &queue_family_count, queue_families.data());
+
+
+		// IDEAL = Find a queue that only handled compute workloads
+		VkQueueFlags compute_family_index = VK_QUEUE_FLAG_BITS_MAX_ENUM;
+		for (auto i = 0; i < queue_families.size(); ++i)
+		{
+			const auto& queue_familiy = queue_families[i];
+			print_queue_flags(i, queue_familiy.queueFlags);
+
+			if (queue_familiy.queueCount > 0 && (queue_familiy.queueFlags & VK_QUEUE_COMPUTE_BIT))
+			{
+				if (queue_familiy.queueFlags < compute_family_index)
+					compute_family_index = i;
+			}
+		}
+		indices.compute_family = compute_family_index;
 
 		for (auto i = 0; i < queue_families.size(); ++i)
 		{
@@ -56,7 +90,9 @@ namespace helper
 			vkGetPhysicalDeviceSurfaceSupportKHR(physical_device, i, surface, &present_support);
 
 			if (queue_familiy.queueCount > 0 && present_support)
+			{
 				indices.present_family = i;
+			}
 
 			if (indices.is_complete())
 				break;
@@ -233,7 +269,7 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 
 static void resize_callback(GLFWwindow* window, int width, int height)
 {
-	auto app = reinterpret_cast<CircleCollisionSimple*>(glfwGetWindowUserPointer(window));
+	auto app = reinterpret_cast<CircleCollisionComputeShader*>(glfwGetWindowUserPointer(window));
 	app->window_resize();
 }
 
@@ -267,7 +303,7 @@ static std::vector<char> read_file(const std::string& fileName)
 	return buffer;
 }
 
-void CircleCollisionSimple::initialize()
+void CircleCollisionComputeShader::initialize()
 {
 	srand(time(NULL));
 	validation_layers_enabled = false;
@@ -277,7 +313,7 @@ void CircleCollisionSimple::initialize()
 	this->app_path = std::string(current_path);
 }
 
-bool CircleCollisionSimple::run()
+bool CircleCollisionComputeShader::run()
 {
 	if (!setup_window())
 		return false;
@@ -294,7 +330,7 @@ bool CircleCollisionSimple::run()
 	return true;
 }
 
-bool CircleCollisionSimple::setup_window()
+bool CircleCollisionComputeShader::setup_window()
 {
 	glfwInit();
 
@@ -309,7 +345,7 @@ bool CircleCollisionSimple::setup_window()
 	return true;
 }
 
-bool CircleCollisionSimple::setup_vulkan()
+bool CircleCollisionComputeShader::setup_vulkan()
 {
 	if (!create_instance())
 		return false;
@@ -357,7 +393,7 @@ bool CircleCollisionSimple::setup_vulkan()
 	return true;
 }
 
-bool CircleCollisionSimple::create_instance()
+bool CircleCollisionComputeShader::create_instance()
 {
 	VkApplicationInfo app_info = {};
 	app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -477,7 +513,7 @@ bool CircleCollisionSimple::create_instance()
 	return result == VK_SUCCESS;
 }
 
-bool CircleCollisionSimple::set_up_debug_messenger()
+bool CircleCollisionComputeShader::set_up_debug_messenger()
 {
 #if defined(_DEBUG)
 	if (!validation_layers_enabled)
@@ -515,7 +551,7 @@ bool CircleCollisionSimple::set_up_debug_messenger()
 #endif
 }
 
-bool CircleCollisionSimple::pick_physical_device()
+bool CircleCollisionComputeShader::pick_physical_device()
 {
 	uint32_t available_physical_devices_count = 0;
 	vkEnumeratePhysicalDevices(this->instance, &available_physical_devices_count, nullptr);
@@ -539,8 +575,8 @@ bool CircleCollisionSimple::pick_physical_device()
 		vkGetPhysicalDeviceProperties(physical_device, &device_properties);
 		vkGetPhysicalDeviceFeatures(physical_device, &device_features);
 
-		//I just skip here since i only have Intel's GPU on Surface Pro 6 
-		if (helper::find_queue_family_indices(physical_device, this->surface).is_complete())
+		this->family_indices = helper::find_queue_family_indices(physical_device, this->surface);
+		if (this->family_indices.is_complete())
 		{
 			selected_device = i;
 			break;
@@ -558,7 +594,7 @@ bool CircleCollisionSimple::pick_physical_device()
 	return true;
 }
 
-bool CircleCollisionSimple::check_device_extensions_support()
+bool CircleCollisionComputeShader::check_device_extensions_support()
 {
 	uint32_t available_extensions_count;
 	vkEnumerateDeviceExtensionProperties(this->physical_device, nullptr, &available_extensions_count, nullptr);
@@ -573,13 +609,17 @@ bool CircleCollisionSimple::check_device_extensions_support()
 	return required_extensions.empty();
 }
 
-bool CircleCollisionSimple::create_logical_device()
+bool CircleCollisionComputeShader::create_logical_device()
 {
 	if (!check_device_extensions_support())
 		return false;
 
-	this->family_indices = helper::find_queue_family_indices(this->physical_device, this->surface);
-	std::set<uint32_t> unique_queue_families = { family_indices.graphics_family.value(), family_indices.present_family.value() };
+	std::set<uint32_t> unique_queue_families =
+	{
+		this->family_indices.graphics_family.value(),
+		this->family_indices.present_family.value(),
+		this->family_indices.compute_family.value(),
+	};
 
 	std::vector<VkDeviceQueueCreateInfo> queue_create_infos;
 
@@ -618,18 +658,19 @@ bool CircleCollisionSimple::create_logical_device()
 
 	auto result = vkCreateDevice(this->physical_device, &create_info, nullptr, &this->device);
 
-	vkGetDeviceQueue(device, family_indices.graphics_family.value(), 0, &graphics_queue);
-	vkGetDeviceQueue(device, family_indices.present_family.value(), 0, &present_queue);
+	vkGetDeviceQueue(device, family_indices.graphics_family.value(), 0, &this->graphics_queue);
+	vkGetDeviceQueue(device, family_indices.present_family.value(), 0, &this->present_queue);
+	vkGetDeviceQueue(device, family_indices.compute_family.value(), 0, &this->compute_queue);
 
 	return result == VK_SUCCESS;
 }
 
-bool CircleCollisionSimple::create_surface()
+bool CircleCollisionComputeShader::create_surface()
 {
 	return glfwCreateWindowSurface(this->instance, this->window, nullptr, &this->surface) == VK_SUCCESS;
 }
 
-bool CircleCollisionSimple::create_swap_chain()
+bool CircleCollisionComputeShader::create_swap_chain()
 {
 	// Get Properties
 
@@ -763,7 +804,7 @@ bool CircleCollisionSimple::create_swap_chain()
 	return true;
 }
 
-bool CircleCollisionSimple::create_image_views()
+bool CircleCollisionComputeShader::create_image_views()
 {
 	this->swap_chain_image_views.resize(this->swap_chain_images.size());
 
@@ -791,7 +832,7 @@ bool CircleCollisionSimple::create_image_views()
 	return true;
 }
 
-bool CircleCollisionSimple::create_renderpass()
+bool CircleCollisionComputeShader::create_renderpass()
 {
 	// Graphics Subpass
 	VkAttachmentReference color_attach_ref = {};
@@ -841,7 +882,7 @@ bool CircleCollisionSimple::create_renderpass()
 	return true;
 }
 
-bool CircleCollisionSimple::create_descriptor_set_layout()
+bool CircleCollisionComputeShader::create_descriptor_set_layout()
 {
 	VkDescriptorSetLayoutBinding descriptor_set_binding = {};
 	descriptor_set_binding.binding = 0;
@@ -861,10 +902,10 @@ bool CircleCollisionSimple::create_descriptor_set_layout()
 	return true;
 }
 
-bool CircleCollisionSimple::create_graphics_pipeline()
+bool CircleCollisionComputeShader::create_graphics_pipeline()
 {
-	auto vert_shader = read_file(this->app_path + "\\..\\..\\..\\src\\circle_collision_simple\\shaders\\shaders.vert.spv");
-	auto frag_shader = read_file(this->app_path + "\\..\\..\\..\\src\\circle_collision_simple\\shaders\\shaders.frag.spv");
+	auto vert_shader = read_file(this->app_path + "\\..\\..\\..\\src\\circle_collision_compute_shader\\shaders\\shaders.vert.spv");
+	auto frag_shader = read_file(this->app_path + "\\..\\..\\..\\src\\circle_collision_compute_shader\\shaders\\shaders.frag.spv");
 
 	if (vert_shader.empty() || frag_shader.empty())
 	{
@@ -1032,7 +1073,7 @@ bool CircleCollisionSimple::create_graphics_pipeline()
 	return true;
 }
 
-bool CircleCollisionSimple::create_vertex_buffer()
+bool CircleCollisionComputeShader::create_vertex_buffer()
 {
 	get_circle_model(30, &this->circle_model);
 	const VkDeviceSize buffer_size = sizeof(Vertex) * this->circle_model.vertices.size();
@@ -1077,7 +1118,7 @@ bool CircleCollisionSimple::create_vertex_buffer()
 	return true;
 }
 
-bool CircleCollisionSimple::create_index_buffer()
+bool CircleCollisionComputeShader::create_index_buffer()
 {
 	const VkDeviceSize buffer_size = sizeof(uint16_t) * this->circle_model.indices.size();
 
@@ -1121,7 +1162,7 @@ bool CircleCollisionSimple::create_index_buffer()
 	return true;
 }
 
-bool CircleCollisionSimple::create_instance_buffers()
+bool CircleCollisionComputeShader::create_instance_buffers()
 {
 	setup_circles();
 
@@ -1135,7 +1176,7 @@ bool CircleCollisionSimple::create_instance_buffers()
 	return true;
 }
 
-bool CircleCollisionSimple::create_uniform_buffers()
+bool CircleCollisionComputeShader::create_uniform_buffers()
 {
 	const auto buffer_size = sizeof(UniformBufferObject);
 
@@ -1161,7 +1202,7 @@ bool CircleCollisionSimple::create_uniform_buffers()
 	return true;
 }
 
-bool CircleCollisionSimple::create_descriptor_pool()
+bool CircleCollisionComputeShader::create_descriptor_pool()
 {
 	VkDescriptorPoolSize pool_size = {};
 	pool_size.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -1181,9 +1222,9 @@ bool CircleCollisionSimple::create_descriptor_pool()
 	return true;
 }
 
-bool CircleCollisionSimple::create_descriptor_sets()
+bool CircleCollisionComputeShader::create_descriptor_sets()
 {
-	std::vector<VkDescriptorSetLayout> layouts(swap_chain_images.size(), ubo_descriptor_set_layout);
+	std::vector<VkDescriptorSetLayout> layouts(swap_chain_images.size(), this->ubo_descriptor_set_layout);
 
 	VkDescriptorSetAllocateInfo alloc_info = {};
 	alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -1216,7 +1257,7 @@ bool CircleCollisionSimple::create_descriptor_sets()
 	}
 }
 
-bool CircleCollisionSimple::create_frame_buffers()
+bool CircleCollisionComputeShader::create_frame_buffers()
 {
 	this->swap_chain_frame_buffers.resize(this->swap_chain_image_views.size());
 
@@ -1246,7 +1287,7 @@ bool CircleCollisionSimple::create_frame_buffers()
 	return true;
 }
 
-bool CircleCollisionSimple::create_command_pool()
+bool CircleCollisionComputeShader::create_command_pool()
 {
 	VkCommandPoolCreateInfo create_info = {};
 
@@ -1263,7 +1304,7 @@ bool CircleCollisionSimple::create_command_pool()
 	return true;
 }
 
-bool CircleCollisionSimple::create_command_buffers()
+bool CircleCollisionComputeShader::create_command_buffers()
 {
 	this->command_buffers.resize(this->swap_chain_frame_buffers.size());
 
@@ -1341,7 +1382,7 @@ bool CircleCollisionSimple::create_command_buffers()
 	return true;
 }
 
-bool CircleCollisionSimple::create_sync_objects()
+bool CircleCollisionComputeShader::create_sync_objects()
 {
 	this->num_frames = this->swap_chain_images.size();
 
@@ -1371,7 +1412,7 @@ bool CircleCollisionSimple::create_sync_objects()
 	return true;
 }
 
-bool CircleCollisionSimple::cleanup_swap_chain()
+bool CircleCollisionComputeShader::cleanup_swap_chain()
 {
 	for (auto& frame_buffer : this->swap_chain_frame_buffers)
 		vkDestroyFramebuffer(this->device, frame_buffer, nullptr);
@@ -1396,7 +1437,7 @@ bool CircleCollisionSimple::cleanup_swap_chain()
 	return true;
 }
 
-bool CircleCollisionSimple::recreate_swap_chain()
+bool CircleCollisionComputeShader::recreate_swap_chain()
 {
 	vkDeviceWaitIdle(this->device);
 
@@ -1432,7 +1473,7 @@ bool CircleCollisionSimple::recreate_swap_chain()
 	return true;
 }
 
-bool CircleCollisionSimple::set_viewport_scissor()
+bool CircleCollisionComputeShader::set_viewport_scissor()
 {
 	this->viewport = {};
 	viewport.x = 0.0f;
@@ -1449,7 +1490,7 @@ bool CircleCollisionSimple::set_viewport_scissor()
 	return true;
 }
 
-void CircleCollisionSimple::update(const uint32_t& current_image)
+void CircleCollisionComputeShader::update(const uint32_t& current_image)
 {
 	static auto start_time = std::chrono::high_resolution_clock::now();
 
@@ -1474,7 +1515,7 @@ void CircleCollisionSimple::update(const uint32_t& current_image)
 	}
 
 	const auto right_wall = (mouse_bounding_enabled && draw) ? mouse_pos.x : INIT_WIDTH;
-	const auto bottom_wall =  (mouse_bounding_enabled && draw) ? mouse_pos.y : INIT_HEIGHT;
+	const auto bottom_wall = (mouse_bounding_enabled && draw) ? mouse_pos.y : INIT_HEIGHT;
 
 	// Optimize : Think Data-Oriented
 	for (size_t i = 0; i < instance_count; ++i)
@@ -1576,7 +1617,7 @@ void CircleCollisionSimple::update(const uint32_t& current_image)
 	vkUnmapMemory(this->device, this->ubo_buffers_memory[current_image]);
 }
 
-bool CircleCollisionSimple::draw_frame()
+bool CircleCollisionComputeShader::draw_frame()
 {
 	vkWaitForFences(this->device, 1, &this->draw_fences[this->current_frame], VK_TRUE, std::numeric_limits<uint64_t>::max());
 
@@ -1662,7 +1703,7 @@ bool CircleCollisionSimple::draw_frame()
 	return true;
 }
 
-bool CircleCollisionSimple::main_loop()
+bool CircleCollisionComputeShader::main_loop()
 {
 	this->last_timestamp = std::chrono::high_resolution_clock::now();
 
@@ -1699,7 +1740,7 @@ bool CircleCollisionSimple::main_loop()
 	return true;
 }
 
-bool CircleCollisionSimple::release()
+bool CircleCollisionComputeShader::release()
 {
 	if (is_released)
 		return true;
@@ -1767,12 +1808,12 @@ bool CircleCollisionSimple::release()
 	return true;
 }
 
-void CircleCollisionSimple::window_resize()
+void CircleCollisionComputeShader::window_resize()
 {
 	this->should_recreate_swapchain = true;
 }
 
-bool CircleCollisionSimple::create_colors_buffer()
+bool CircleCollisionComputeShader::create_colors_buffer()
 {
 	const VkDeviceSize buffer_size = sizeof(glm::vec3) * instance_count;
 
@@ -1796,7 +1837,7 @@ bool CircleCollisionSimple::create_colors_buffer()
 	return true;
 }
 
-bool CircleCollisionSimple::create_positions_buffer()
+bool CircleCollisionComputeShader::create_positions_buffer()
 {
 	const VkDeviceSize buffer_size = sizeof(glm::vec2) * instance_count;
 
@@ -1820,7 +1861,7 @@ bool CircleCollisionSimple::create_positions_buffer()
 	return true;
 }
 
-bool CircleCollisionSimple::create_scales_buffer()
+bool CircleCollisionComputeShader::create_scales_buffer()
 {
 	const VkDeviceSize buffer_size = sizeof(float) * instance_count;
 
@@ -1864,7 +1905,7 @@ bool CircleCollisionSimple::create_scales_buffer()
 	return true;
 }
 
-void CircleCollisionSimple::setup_circles()
+void CircleCollisionComputeShader::setup_circles()
 {
 	this->circles.resize(instance_count);
 

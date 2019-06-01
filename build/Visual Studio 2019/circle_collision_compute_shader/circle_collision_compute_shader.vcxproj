@@ -20,8 +20,8 @@
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
-    <ProjectGuid>{40FD6623-F659-45ED-9ED5-AD2119795132}</ProjectGuid>
-    <RootNamespace>circlecollisionsimple</RootNamespace>
+    <ProjectGuid>{3C30986F-0604-455D-B5C4-B7F00EA88BB2}</ProjectGuid>
+    <RootNamespace>circlecollisioncomputeshader</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -71,19 +71,28 @@
     <Import Project="..\release_x64.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>$(SolutionDir)/../../src;$(SolutionDir)/../../3rd-party/glm/include;$(SolutionDir)/../../3rd-party/glfw/include;$(VulkanDir)/Include;$(IncludePath)</IncludePath>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>$(SolutionDir)/../../src;$(SolutionDir)/../../3rd-party/glm/include;$(SolutionDir)/../../3rd-party/glfw/include;$(VulkanDir)/Include;$(IncludePath)</IncludePath>
-  </PropertyGroup>
+  <PropertyGroup />
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <ConformanceMode>true</ConformanceMode>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+    </Link>
+  </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -95,12 +104,9 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
-      <AdditionalDependencies>glm_static.lib;glfw3.lib;vulkan-1.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(VulkanDir)/Lib;$(SolutionDir)/../../3rd-party/glm/lib/x64/Debug;$(SolutionDir)/../../3rd-party/glfw/lib/x64/Debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -111,44 +117,25 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-    </Link>
-  </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <ClCompile>
-      <WarningLevel>Level3</WarningLevel>
-      <Optimization>MaxSpeed</Optimization>
-      <FunctionLevelLinking>true</FunctionLevelLinking>
-      <IntrinsicFunctions>true</IntrinsicFunctions>
-      <SDLCheck>true</SDLCheck>
-      <ConformanceMode>true</ConformanceMode>
-      <LanguageStandard>stdcpp17</LanguageStandard>
-    </ClCompile>
-    <Link>
-      <SubSystem>Console</SubSystem>
-      <EnableCOMDATFolding>true</EnableCOMDATFolding>
-      <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>glm_static.lib;glfw3.lib;vulkan-1.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(VulkanDir)/Lib;$(SolutionDir)/../../3rd-party/glfw/lib/x64/Release;$(SolutionDir)/../../3rd-party/glm/lib/x64/Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\src\circle_collision_simple\circle_collision_simple.h" />
+    <ClInclude Include="..\..\..\src\circle_collision_compute_shader\circle_collision_compute_shader.h" />
     <ClInclude Include="..\..\..\src\Renderer\common.hpp" />
     <ClInclude Include="..\..\..\src\Renderer\vulkan_initializers.hpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\src\circle_collision_simple\main.cpp" />
-    <ClCompile Include="..\..\..\src\circle_collision_simple\circle_collision_simple.cpp" />
+    <ClCompile Include="..\..\..\src\circle_collision_compute_shader\circle_collision_compute_shader.cpp" />
+    <ClCompile Include="..\..\..\src\circle_collision_compute_shader\main.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\..\src\circle_collision_simple\shaders\shaders.frag" />
-    <None Include="..\..\..\src\circle_collision_simple\shaders\shaders.vert" />
+    <None Include="..\..\..\src\circle_collision_compute_shader\shaders\shaders.frag" />
+    <None Include="..\..\..\src\circle_collision_compute_shader\shaders\shaders.vert" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

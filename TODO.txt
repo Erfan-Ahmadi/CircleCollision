@@ -1,0 +1,6 @@
+CPU SIMPLE
+CPU SIMD (SSE, SSE2, AVX2?)
+GPU OpenCL
+GPU Vulkan Compute Shader
+
+** Try Spatial Partitioning for all above

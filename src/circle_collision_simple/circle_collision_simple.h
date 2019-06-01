@@ -24,9 +24,11 @@ namespace helper
 	{
 		std::optional<uint32_t> graphics_family;
 		std::optional<uint32_t> present_family;
+		std::optional<uint32_t> compute_family;
 
-		bool is_complete() {
-			return graphics_family.has_value() && present_family.has_value();
+		bool is_complete() 
+		{
+			return graphics_family.has_value() && present_family.has_value() && compute_family.has_value();
 		}
 	};
 
@@ -197,6 +199,7 @@ private:
 
 	VkQueue graphics_queue;
 	VkQueue present_queue;
+	VkQueue compute_queue;
 
 	bool should_recreate_swapchain;
 

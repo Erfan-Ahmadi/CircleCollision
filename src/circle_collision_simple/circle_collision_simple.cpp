@@ -20,12 +20,12 @@ constexpr int INIT_HEIGHT = 720;
 #define POSITIONS_BUFFER_BIND_ID			2 // PER INSTANCE
 #define SCALE_BUFFER_BIND_ID				3 // PER INSTANCE
 
-constexpr uint64_t	instance_count		= (1 << 10);
-constexpr float		relative_velocity	= 0.1f;
-constexpr float		relative_scale		= 1.0f;
+constexpr uint64_t	instance_count = (1 << 10);
+constexpr float		relative_velocity = 0.1f;
+constexpr float		relative_scale = 1.0f;
 
-constexpr bool mouse_bounding_enabled	= false;
-constexpr bool mouse_drawing_enabled	= true;
+constexpr bool mouse_bounding_enabled = false;
+constexpr bool mouse_drawing_enabled = true;
 
 float mouse_draw_radius = 30.0f;
 
@@ -33,15 +33,49 @@ char title[64];
 
 namespace helper
 {
+	void print_queue_flags(const int& index, const VkQueueFlags& queue_flags)
+	{
+		std::cout << "Queue Index " << index << " :" << std::endl;
+
+		if (queue_flags & VK_QUEUE_GRAPHICS_BIT)
+			std::cout << "\tVK_QUEUE_GRAPHICS_BIT" << std::endl;
+		if (queue_flags & VK_QUEUE_COMPUTE_BIT)
+			std::cout << "\tVK_QUEUE_COMPUTE_BIT" << std::endl;
+		if (queue_flags & VK_QUEUE_TRANSFER_BIT)
+			std::cout << "\tVK_QUEUE_TRANSFER_BIT" << std::endl;
+		if (queue_flags & VK_QUEUE_SPARSE_BINDING_BIT)
+			std::cout << "\tVK_QUEUE_SPARSE_BINDING_BIT" << std::endl;
+		if (queue_flags & VK_QUEUE_PROTECTED_BIT)
+			std::cout << "\tVK_QUEUE_PROTECTED_BIT" << std::endl;
+	}
+
 	QueueFamilyIndices find_queue_family_indices(const VkPhysicalDevice& physical_device, const VkSurfaceKHR& surface)
 	{
 		QueueFamilyIndices indices;
 
-		uint32_t queueFamilyCount = 0;
-		vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &queueFamilyCount, nullptr);
+		uint32_t queue_family_count = 0;
+		vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &queue_family_count, nullptr);
 
-		std::vector<VkQueueFamilyProperties> queue_families(queueFamilyCount);
-		vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &queueFamilyCount, queue_families.data());
+		std::cout << "\n\nQueue Families Count = " << queue_family_count << std::endl;
+
+		std::vector<VkQueueFamilyProperties> queue_families(queue_family_count);
+		vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &queue_family_count, queue_families.data());
+
+
+		// IDEAL = Find a queue that only handled compute workloads
+		VkQueueFlags compute_family_index = VK_QUEUE_FLAG_BITS_MAX_ENUM;
+		for (auto i = 0; i < queue_families.size(); ++i)
+		{
+			const auto& queue_familiy = queue_families[i];
+			print_queue_flags(i, queue_familiy.queueFlags);
+
+			if (queue_familiy.queueCount > 0 && (queue_familiy.queueFlags & VK_QUEUE_COMPUTE_BIT))
+			{
+				if (queue_familiy.queueFlags < compute_family_index)
+					compute_family_index = i;
+			}
+		}
+		indices.compute_family = compute_family_index;
 
 		for (auto i = 0; i < queue_families.size(); ++i)
 		{
@@ -56,7 +90,9 @@ namespace helper
 			vkGetPhysicalDeviceSurfaceSupportKHR(physical_device, i, surface, &present_support);
 
 			if (queue_familiy.queueCount > 0 && present_support)
+			{
 				indices.present_family = i;
+			}
 
 			if (indices.is_complete())
 				break;
@@ -539,8 +575,8 @@ bool CircleCollisionSimple::pick_physical_device()
 		vkGetPhysicalDeviceProperties(physical_device, &device_properties);
 		vkGetPhysicalDeviceFeatures(physical_device, &device_features);
 
-		//I just skip here since i only have Intel's GPU on Surface Pro 6 
-		if (helper::find_queue_family_indices(physical_device, this->surface).is_complete())
+		this->family_indices = helper::find_queue_family_indices(physical_device, this->surface);
+		if (this->family_indices.is_complete())
 		{
 			selected_device = i;
 			break;
@@ -578,8 +614,12 @@ bool CircleCollisionSimple::create_logical_device()
 	if (!check_device_extensions_support())
 		return false;
 
-	this->family_indices = helper::find_queue_family_indices(this->physical_device, this->surface);
-	std::set<uint32_t> unique_queue_families = { family_indices.graphics_family.value(), family_indices.present_family.value() };
+	std::set<uint32_t> unique_queue_families =
+	{
+		this->family_indices.graphics_family.value(),
+		this->family_indices.present_family.value(),
+		this->family_indices.compute_family.value(),
+	};
 
 	std::vector<VkDeviceQueueCreateInfo> queue_create_infos;
 
@@ -618,8 +658,9 @@ bool CircleCollisionSimple::create_logical_device()
 
 	auto result = vkCreateDevice(this->physical_device, &create_info, nullptr, &this->device);
 
-	vkGetDeviceQueue(device, family_indices.graphics_family.value(), 0, &graphics_queue);
-	vkGetDeviceQueue(device, family_indices.present_family.value(), 0, &present_queue);
+	vkGetDeviceQueue(device, family_indices.graphics_family.value(), 0, &this->graphics_queue);
+	vkGetDeviceQueue(device, family_indices.present_family.value(), 0, &this->present_queue);
+	vkGetDeviceQueue(device, family_indices.compute_family.value(), 0, &this->compute_queue);
 
 	return result == VK_SUCCESS;
 }
@@ -1474,7 +1515,7 @@ void CircleCollisionSimple::update(const uint32_t& current_image)
 	}
 
 	const auto right_wall = (mouse_bounding_enabled && draw) ? mouse_pos.x : INIT_WIDTH;
-	const auto bottom_wall =  (mouse_bounding_enabled && draw) ? mouse_pos.y : INIT_HEIGHT;
+	const auto bottom_wall = (mouse_bounding_enabled && draw) ? mouse_pos.y : INIT_HEIGHT;
 
 	// Optimize : Think Data-Oriented
 	for (size_t i = 0; i < instance_count; ++i)

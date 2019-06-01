@@ -20,20 +20,20 @@
 
 namespace helper
 {
-	struct QueueFamilyIndices 
+	struct QueueFamilyIndices
 	{
 		std::optional<uint32_t> graphics_family;
 		std::optional<uint32_t> present_family;
 		std::optional<uint32_t> compute_family;
 
-		bool is_complete() 
+		bool is_complete()
 		{
 			return graphics_family.has_value() && present_family.has_value() && compute_family.has_value();
 		}
 	};
 
 	QueueFamilyIndices find_queue_family_indices(const VkPhysicalDevice& physical_device, const VkSurfaceKHR& surface);
-	
+
 	uint32_t find_memory_type(uint32_t type_filter, VkMemoryPropertyFlags properties, VkPhysicalDevice physical_device);
 
 	bool create_buffer(
@@ -96,7 +96,7 @@ struct circles_strcut
 		scales.resize(size);
 	}
 };
- 
+
 struct CircleCollisionComputeShader
 {
 public:
@@ -117,6 +117,7 @@ private:
 	bool set_up_debug_messenger();
 	bool pick_physical_device();
 
+	// Graphics
 	bool check_device_extensions_support();
 	bool create_logical_device();
 	bool create_surface();
@@ -135,7 +136,7 @@ private:
 	bool create_command_pool();
 	bool create_command_buffers();
 	bool create_sync_objects();
-	
+
 	bool create_colors_buffer(); //
 	bool create_positions_buffer(); //
 	bool create_scales_buffer(); // 
@@ -149,16 +150,46 @@ private:
 	bool draw_frame();
 
 	bool main_loop();
+
+	// Compute
+	bool prepare_compute();
+	bool prepare_compute_buffers();
+	bool create_compute_command_buffers();
 	
+// TODO: Consider more than 1 swapchain image
+	struct
+	{
+		VkDescriptorSetLayout descriptor_set_layout;
+		VkDescriptorSet descriptor_set;
+
+		VkCommandPool command_pool;
+		VkCommandBuffer command_buffer;
+		VkQueue queue;
+		VkFence fence;
+		VkPipelineLayout pipeline_layout;
+		VkPipeline pipeline;
+
+		VkBuffer ubo_buffer;
+		VkDeviceMemory ubo_buffer_memory;
+		VkDescriptorBufferInfo ubo_buffer_descriptor;
+
+		VkBuffer storage_buffer;
+		VkDeviceMemory storage_buffer_memory;
+		VkDescriptorBufferInfo storage_buffer_descriptor;
+
+		struct
+		{
+			alignas(alignof(float)) float dt;
+		} ubo;
+	} compute;
+
 	// Sample ----------------
-	
+
 	model circle_model;
 
 	void setup_circles();
 	circles_strcut circles;
 
-	std::vector<VkBuffer> ubo_buffers;
-	std::vector<VkDeviceMemory> ubo_buffers_memory;
 
 	VkBuffer vertex_buffer;
 	VkDeviceMemory vertex_buffer_memory;
@@ -171,17 +202,20 @@ private:
 
 	VkBuffer scales_buffer;
 	VkDeviceMemory scales_buffer_memory;
-	
+
 	VkBuffer positions_buffer;
 	VkDeviceMemory positions_buffer_memory;
 
-	VkDescriptorPool ubo_descriptor_pool;
+	std::vector<VkBuffer> ubo_buffers;
+	std::vector<VkDeviceMemory> ubo_buffers_memory;
+
+	VkDescriptorPool descriptor_pool;
 	std::vector<VkDescriptorSet> ubo_descriptor_sets;
 	VkDescriptorSetLayout ubo_descriptor_set_layout;
 
 	VkPipelineLayout pipeline_layout;
 	VkPipeline graphics_pipeline;
-	
+
 	VkCommandPool command_pool;
 	std::vector<VkCommandBuffer> command_buffers;
 
@@ -199,7 +233,6 @@ private:
 
 	VkQueue graphics_queue;
 	VkQueue present_queue;
-	VkQueue compute_queue;
 
 	bool should_recreate_swapchain;
 

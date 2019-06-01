@@ -134,6 +134,7 @@
     <ClCompile Include="..\..\..\src\circle_collision_compute_shader\main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="..\..\..\src\circle_collision_compute_shader\shaders\shaders.comp" />
     <None Include="..\..\..\src\circle_collision_compute_shader\shaders\shaders.frag" />
     <None Include="..\..\..\src\circle_collision_compute_shader\shaders\shaders.vert" />
   </ItemGroup>

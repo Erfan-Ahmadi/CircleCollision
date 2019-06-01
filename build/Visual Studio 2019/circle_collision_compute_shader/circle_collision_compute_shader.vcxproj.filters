@@ -43,5 +43,8 @@
     <None Include="..\..\..\src\circle_collision_compute_shader\shaders\shaders.vert">
       <Filter>Resource Files</Filter>
     </None>
+    <None Include="..\..\..\src\circle_collision_compute_shader\shaders\shaders.comp">
+      <Filter>Resource Files</Filter>
+    </None>
   </ItemGroup>
 </Project>

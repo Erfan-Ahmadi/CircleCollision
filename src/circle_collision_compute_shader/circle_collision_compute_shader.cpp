@@ -660,7 +660,6 @@ bool CircleCollisionComputeShader::create_logical_device()
 
 	vkGetDeviceQueue(device, family_indices.graphics_family.value(), 0, &this->graphics_queue);
 	vkGetDeviceQueue(device, family_indices.present_family.value(), 0, &this->present_queue);
-	vkGetDeviceQueue(device, family_indices.compute_family.value(), 0, &this->compute_queue);
 
 	return result == VK_SUCCESS;
 }
@@ -1204,17 +1203,20 @@ bool CircleCollisionComputeShader::create_uniform_buffers()
 
 bool CircleCollisionComputeShader::create_descriptor_pool()
 {
-	VkDescriptorPoolSize pool_size = {};
-	pool_size.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	pool_size.descriptorCount = static_cast<uint32_t>(this->swap_chain_images.size());
+	std::vector<VkDescriptorPoolSize> pool_sizes =
+	{
+		{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, static_cast<uint32_t>(this->swap_chain_images.size())}, // GRAPHICS UBO
+		{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1}, // COMPUTE UB
+		{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1}, // COMPUTE SB
+	};
 
 	VkDescriptorPoolCreateInfo pool_info = {};
 	pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-	pool_info.poolSizeCount = 1;
-	pool_info.pPoolSizes = &pool_size;
+	pool_info.poolSizeCount = static_cast<uint32_t>(pool_sizes.size());
+	pool_info.pPoolSizes = pool_sizes.data();
 	pool_info.maxSets = static_cast<uint32_t>(this->swap_chain_images.size());
 
-	if (vkCreateDescriptorPool(this->device, &pool_info, nullptr, &this->ubo_descriptor_pool) != VK_SUCCESS)
+	if (vkCreateDescriptorPool(this->device, &pool_info, nullptr, &this->descriptor_pool) != VK_SUCCESS)
 	{
 		return false;
 	}
@@ -1229,7 +1231,7 @@ bool CircleCollisionComputeShader::create_descriptor_sets()
 	VkDescriptorSetAllocateInfo alloc_info = {};
 	alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 	alloc_info.pSetLayouts = layouts.data();
-	alloc_info.descriptorPool = this->ubo_descriptor_pool;
+	alloc_info.descriptorPool = this->descriptor_pool;
 	alloc_info.descriptorSetCount = static_cast<uint32_t>(this->swap_chain_images.size());
 
 	this->ubo_descriptor_sets.resize(swap_chain_images.size());
@@ -1432,7 +1434,7 @@ bool CircleCollisionComputeShader::cleanup_swap_chain()
 		vkFreeMemory(this->device, this->ubo_buffers_memory[i], nullptr);
 	}
 
-	vkDestroyDescriptorPool(this->device, this->ubo_descriptor_pool, nullptr);
+	vkDestroyDescriptorPool(this->device, this->descriptor_pool, nullptr);
 
 	return true;
 }
@@ -1736,6 +1738,178 @@ bool CircleCollisionComputeShader::main_loop()
 
 		glfwPollEvents();
 	}
+
+	return true;
+}
+
+bool CircleCollisionComputeShader::prepare_compute()
+{
+	vkGetDeviceQueue(device, family_indices.compute_family.value(), 0, &this->compute.queue);
+
+	if(!prepare_compute_buffers())
+		return false;
+
+	// Compute Descriptor Set Layout 
+	std::vector<VkDescriptorSetLayoutBinding> bindings =
+	{
+		{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
+		{1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}
+	};
+
+	VkDescriptorSetLayoutCreateInfo compute_descriptor_set_layout = {};
+	compute_descriptor_set_layout.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	compute_descriptor_set_layout.bindingCount = static_cast<uint32_t>(bindings.size());
+	compute_descriptor_set_layout.pBindings = bindings.data();
+
+	if (vkCreateDescriptorSetLayout(this->device, &compute_descriptor_set_layout, nullptr, &this->compute.descriptor_set_layout) != VK_SUCCESS)
+	{
+		return false;
+	}
+
+	// Pipeline Layout
+	VkPipelineLayoutCreateInfo pipeline_layout_info = {};
+	pipeline_layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+	pipeline_layout_info.setLayoutCount = 1;
+	pipeline_layout_info.pSetLayouts = &this->compute.descriptor_set_layout;
+
+	if (vkCreatePipelineLayout(this->device, &pipeline_layout_info, nullptr, &this->compute.pipeline_layout) != VK_SUCCESS)
+	{
+		return false;
+	}
+
+	// Allocate and Write to Descriptor Set
+	VkDescriptorSetAllocateInfo descriptor_set_alloc_info = {};
+	descriptor_set_alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	descriptor_set_alloc_info.descriptorSetCount = 1;
+	descriptor_set_alloc_info.descriptorPool = this->descriptor_pool;
+	descriptor_set_alloc_info.pSetLayouts = &this->compute.descriptor_set_layout;
+
+	if (vkAllocateDescriptorSets(this->device, &descriptor_set_alloc_info, &this->compute.descriptor_set) != VK_SUCCESS)
+		return false;
+
+	std::vector<VkWriteDescriptorSet> compute_write_descriptor_sets =
+	{
+		// Binding 0 : Positions storage buffer
+		initializers::write_descriptors_set(
+			this->compute.descriptor_set,
+			VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+			0,
+			&this->compute.storage_buffer_descriptor),
+		// Binding 1 : Uniform buffer
+		initializers::write_descriptors_set(
+			this->compute.descriptor_set,
+			VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+			1,
+			&this->compute.ubo_buffer_descriptor)
+	};
+
+	vkUpdateDescriptorSets(device, static_cast<uint32_t>(compute_write_descriptor_sets.size()), compute_write_descriptor_sets.data(), 0, NULL);
+
+	// Create Pipeline
+
+	// Load Compute Shader
+	auto comp_shader = read_file(this->app_path + "\\..\\..\\..\\src\\circle_collision_compute_shader\\shaders\\shaders.comp.spv");
+	VkShaderModule comp_shader_module = helper::create_shader_module(this->device, comp_shader);
+
+	VkPipelineShaderStageCreateInfo compute_shader = {};
+	compute_shader.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	compute_shader.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+	compute_shader.module = comp_shader_module;
+	compute_shader.pName = "main";
+
+	VkComputePipelineCreateInfo compute_pipeline_info = {};
+	compute_pipeline_info.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+	compute_pipeline_info.layout = this->compute.pipeline_layout;
+	compute_pipeline_info.stage = compute_shader;
+
+	if (vkCreateComputePipelines(this->device, VK_NULL_HANDLE, 1, &compute_pipeline_info, nullptr, &this->compute.pipeline) != VK_SUCCESS)
+	{
+		return false;
+	}
+
+	// Fence
+	VkFenceCreateInfo fence_info = {};
+	fence_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+	fence_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+	if (vkCreateFence(this->device, &fence_info, nullptr, &this->compute.fence) != VK_SUCCESS)
+		return false;
+
+	// Command Buffers
+	if (!create_compute_command_buffers())
+		return false;
+
+	return true;
+}
+
+bool CircleCollisionComputeShader::prepare_compute_buffers()
+{
+	return true;
+}
+
+bool CircleCollisionComputeShader::create_compute_command_buffers()
+{
+	VkCommandPoolCreateInfo pool_info = {};
+	pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+	pool_info.queueFamilyIndex = this->family_indices.compute_family.value();
+	pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+
+	if (vkCreateCommandPool(this->device, &pool_info, nullptr, &this->compute.command_pool) != VK_SUCCESS)
+		return false;
+
+	VkCommandBufferAllocateInfo alloc_info = {};
+	alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	alloc_info.commandBufferCount = 1;
+	alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	alloc_info.commandPool = this->compute.command_pool;
+
+	if (vkAllocateCommandBuffers(this->device, &alloc_info, &this->compute.command_buffer) != VK_SUCCESS)
+		return false;
+
+	// Record Command Buffer
+
+	// WAIT FOR VERTEX SHADER READ
+	VkBufferMemoryBarrier barrier = {};
+	barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+	barrier.buffer = this->compute.storage_buffer;
+	barrier.offset = this->compute.storage_buffer_descriptor.offset;
+	barrier.size = this->compute.storage_buffer_descriptor.range;
+	barrier.srcAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
+	barrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT; // ??
+	barrier.srcQueueFamilyIndex = this->family_indices.graphics_family.value();
+	barrier.dstQueueFamilyIndex = this->family_indices.compute_family.value();
+
+	vkCmdPipelineBarrier(
+		this->compute.command_buffer,
+		VK_SHADER_STAGE_VERTEX_BIT,
+		VK_SHADER_STAGE_COMPUTE_BIT,
+		0, // No Flags
+		0, nullptr,
+		1, &barrier,
+		0, nullptr);
+
+	// WAIT FOR COMPUTE SHADER WRITE
+	barrier.buffer = this->compute.storage_buffer;
+	barrier.offset = this->compute.storage_buffer_descriptor.offset;
+	barrier.size = this->compute.storage_buffer_descriptor.range;
+	barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+	barrier.dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
+	barrier.srcQueueFamilyIndex = this->family_indices.compute_family.value();
+	barrier.dstQueueFamilyIndex = this->family_indices.graphics_family.value();
+
+	vkCmdBindPipeline(this->compute.command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE,this->compute.pipeline);
+	vkCmdBindDescriptorSets(this->compute.command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, compute.pipeline_layout, 0, 1, &this->compute.descriptor_set, 0, 0);
+
+	// Dispatch the compute job
+
+	vkCmdPipelineBarrier(
+		this->compute.command_buffer,
+		VK_SHADER_STAGE_COMPUTE_BIT,
+		VK_SHADER_STAGE_VERTEX_BIT,
+		0, // No Flags
+		0, nullptr,
+		1, &barrier,
+		0, nullptr);
 
 	return true;
 }

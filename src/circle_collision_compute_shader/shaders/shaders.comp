@@ -1,0 +1,20 @@
+#version 450
+
+layout (local_size_x = 256) in;
+
+// Binding 0 : Position storage buffer
+layout(std140, binding = 0) buffer Pos 
+{
+   vec2 positions[];
+};
+
+layout (binding = 1) uniform UBO 
+{
+	float deltaT;
+} ubo;
+
+void main() 
+{
+
+}
+

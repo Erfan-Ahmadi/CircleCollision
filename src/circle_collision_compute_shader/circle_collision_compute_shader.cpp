@@ -279,7 +279,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
 	const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
 	void* pUserData) {
 
-	std::cerr << "validation layer: " << pCallbackData->pMessage << std::endl;
+	std::cerr << "validation layer: " << pCallbackData->pMessage << std::endl << std::endl;
 
 	return VK_FALSE;
 }
@@ -388,6 +388,8 @@ bool CircleCollisionComputeShader::setup_vulkan()
 	if (!create_command_buffers())
 		return false;
 	if (!create_sync_objects())
+		return false;
+	if (!prepare_compute())
 		return false;
 
 	return true;
@@ -1003,8 +1005,6 @@ bool CircleCollisionComputeShader::create_graphics_pipeline()
 	colorBlending.pAttachments = &colorBlendAttachment;
 
 	// Pipeline 
-
-	// Pipeline Layout : Q : Why layout should be created and what is it's usage?
 	VkPipelineLayoutCreateInfo pipeline_layout_info = {};
 	pipeline_layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	pipeline_layout_info.setLayoutCount = 1;
@@ -1205,8 +1205,7 @@ bool CircleCollisionComputeShader::create_descriptor_pool()
 {
 	std::vector<VkDescriptorPoolSize> pool_sizes =
 	{
-		{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, static_cast<uint32_t>(this->swap_chain_images.size())}, // GRAPHICS UBO
-		{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1}, // COMPUTE UB
+		{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, static_cast<uint32_t>(this->swap_chain_images.size() + 1)}, // GRAPHICS UBO + 1 For COMPUTE
 		{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1}, // COMPUTE SB
 	};
 
@@ -1214,7 +1213,7 @@ bool CircleCollisionComputeShader::create_descriptor_pool()
 	pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	pool_info.poolSizeCount = static_cast<uint32_t>(pool_sizes.size());
 	pool_info.pPoolSizes = pool_sizes.data();
-	pool_info.maxSets = static_cast<uint32_t>(this->swap_chain_images.size());
+	pool_info.maxSets = static_cast<uint32_t>(this->swap_chain_images.size() + 1);
 
 	if (vkCreateDescriptorPool(this->device, &pool_info, nullptr, &this->descriptor_pool) != VK_SUCCESS)
 	{
@@ -1516,98 +1515,6 @@ void CircleCollisionComputeShader::update(const uint32_t& current_image)
 		mouse_pos = glm::vec2(xpos, INIT_HEIGHT - ypos);
 	}
 
-	const auto right_wall = (mouse_bounding_enabled && draw) ? mouse_pos.x : INIT_WIDTH;
-	const auto bottom_wall = (mouse_bounding_enabled && draw) ? mouse_pos.y : INIT_HEIGHT;
-
-	// Optimize : Think Data-Oriented
-	for (size_t i = 0; i < instance_count; ++i)
-	{
-		if (draw && glm::distance(this->circles.positions[i], mouse_pos) < mouse_draw_radius)
-		{
-			this->circles.velocities[i] = (mouse_pos - this->circles.positions[i]) * 10e-4f;
-		}
-
-		this->circles.positions[i] += this->circles.velocities[i] * this->frame_timer;
-
-		if (this->circles.positions[i].y - this->circles.scales[i] <= 0)
-		{
-			this->circles.positions[i].y = this->circles.scales[i];
-			this->circles.velocities[i].y *= -1;
-		}
-		else if (this->circles.positions[i].y + this->circles.scales[i] >= bottom_wall)
-		{
-			this->circles.positions[i].y = bottom_wall - this->circles.scales[i];
-			this->circles.velocities[i].y *= -1;
-		}
-
-		if (this->circles.positions[i].x - this->circles.scales[i] <= 0)
-		{
-			this->circles.positions[i].x = this->circles.scales[i];
-			this->circles.velocities[i].x *= -1;
-		}
-		else if (this->circles.positions[i].x + this->circles.scales[i] >= right_wall)
-		{
-			this->circles.positions[i].x = right_wall - this->circles.scales[i];
-			this->circles.velocities[i].x *= -1;
-		}
-
-		for (size_t j = 0; j < instance_count; ++j)
-		{
-			if (i == j)
-				continue;
-
-			const auto dx = this->circles.positions[i].x - this->circles.positions[j].x;
-			const auto dy = this->circles.positions[i].y - this->circles.positions[j].y;
-			const auto dis2 = (dy * dy + dx * dx);
-			const auto radii = this->circles.scales[i] + this->circles.scales[j];
-
-			if (dis2 < radii * radii)
-			{
-				// Move Away
-				const auto dis = glm::sqrt(dis2);
-				const auto n = glm::vec2(dx / dis, dy / dis);
-				const auto covered = radii - dis;
-				const auto move_vec = n * (covered / 2.0f);
-				this->circles.positions[i] += move_vec;
-				this->circles.positions[j] -= move_vec;
-
-				// Change Velocity Direction
-				const auto m1 = this->circles.scales[i] * 5.0f;
-				const auto m2 = this->circles.scales[j] * 5.0f;
-				const auto p = 2 * (glm::dot(n, this->circles.velocities[i]) - glm::dot(n, this->circles.velocities[j])) / (m1 + m2);
-				this->circles.velocities[i] = (this->circles.velocities[i] - n * m2 * p);
-				this->circles.velocities[j] = (this->circles.velocities[j] + n * m1 * p);
-			}
-		}
-
-		// Check Collision With Mouse
-		if (mouse_drawing_enabled && draw)
-		{
-			const float dx = this->circles.positions[i].x - mouse_pos.x;
-			const float dy = this->circles.positions[i].y - mouse_pos.y;
-			const auto dis2 = (dy * dy + dx * dx);
-			const auto radii = this->circles.scales[i] + mouse_draw_radius;
-
-			if (dis2 < radii * radii)
-			{
-				// Move Away
-				const auto dis = glm::sqrt(dis2);
-				const auto n = glm::vec2(dx / dis, dy / dis);
-				const auto covered = radii - dis;
-				const auto move_vec = n * (covered);
-				this->circles.positions[i] += move_vec;
-			}
-		}
-	}
-
-	if (draw)
-		draw = false;
-
-	static const auto positions_update_size = sizeof(glm::vec2) * instance_count;
-	vkMapMemory(this->device, this->positions_buffer_memory, 0, positions_update_size, 0, &data);
-	memcpy(data, this->circles.positions.data(), positions_update_size);
-	vkUnmapMemory(this->device, this->positions_buffer_memory);
-
 	UniformBufferObject ubo = {};
 
 	ubo.view = glm::lookAt(glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
@@ -1621,6 +1528,12 @@ void CircleCollisionComputeShader::update(const uint32_t& current_image)
 
 bool CircleCollisionComputeShader::draw_frame()
 {
+	VkSubmitInfo submit_info = {};
+	submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submit_info.commandBufferCount = 1;
+	submit_info.pCommandBuffers = &this->compute.command_buffer;
+	//vkQueueSubmit(compute.queue, 1, &submit_info, this->compute.fence);
+
 	vkWaitForFences(this->device, 1, &this->draw_fences[this->current_frame], VK_TRUE, std::numeric_limits<uint64_t>::max());
 
 	// image_index vs current_frame
@@ -1657,7 +1570,7 @@ bool CircleCollisionComputeShader::draw_frame()
 	// Update UBO
 	update(image_index);
 
-	VkSubmitInfo submit_info = {};
+	submit_info = {};
 	submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 	submit_info.commandBufferCount = 1;
 	submit_info.pCommandBuffers = &this->command_buffers[image_index];
@@ -1701,6 +1614,10 @@ bool CircleCollisionComputeShader::draw_frame()
 	}
 
 	this->current_frame = (this->current_frame + 1) % this->num_frames;
+
+	// Submit compute commands
+	//vkWaitForFences(device, 1, &compute.fence, VK_TRUE, UINT64_MAX);
+	//vkResetFences(device, 1, &compute.fence);
 
 	return true;
 }
@@ -1746,7 +1663,7 @@ bool CircleCollisionComputeShader::prepare_compute()
 {
 	vkGetDeviceQueue(device, family_indices.compute_family.value(), 0, &this->compute.queue);
 
-	if(!prepare_compute_buffers())
+	if (!prepare_compute_buffers())
 		return false;
 
 	// Compute Descriptor Set Layout 
@@ -1803,7 +1720,7 @@ bool CircleCollisionComputeShader::prepare_compute()
 			&this->compute.ubo_buffer_descriptor)
 	};
 
-	vkUpdateDescriptorSets(device, static_cast<uint32_t>(compute_write_descriptor_sets.size()), compute_write_descriptor_sets.data(), 0, NULL);
+	vkUpdateDescriptorSets(this->device, static_cast<uint32_t>(compute_write_descriptor_sets.size()), compute_write_descriptor_sets.data(), 0, NULL);
 
 	// Create Pipeline
 
@@ -1839,11 +1756,76 @@ bool CircleCollisionComputeShader::prepare_compute()
 	if (!create_compute_command_buffers())
 		return false;
 
+	vkDestroyShaderModule(this->device, comp_shader_module, nullptr);
+
 	return true;
 }
 
 bool CircleCollisionComputeShader::prepare_compute_buffers()
 {
+	// Create Storage Buffer
+
+	const VkDeviceSize buffer_size = sizeof(glm::vec2) * instance_count;
+
+	VkBuffer staging_buffer;
+	VkDeviceMemory staging_buffer_memory;
+
+	if (!helper::create_buffer(
+		this->device,
+		this->physical_device,
+		buffer_size,
+		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+		staging_buffer,
+		staging_buffer_memory))
+	{
+		return false;
+	}
+
+	void* data;
+	vkMapMemory(this->device, staging_buffer_memory, 0, buffer_size, 0, &data);
+	memcpy(data, this->circles.positions.data(), (size_t)buffer_size);
+	vkUnmapMemory(this->device, staging_buffer_memory);
+
+	if (!helper::create_buffer(
+		this->device,
+		this->physical_device,
+		buffer_size,
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+		this->compute.storage_buffer,
+		this->compute.storage_buffer_memory))
+	{
+		return false;
+	}
+
+	helper::copy_buffer(this->device, this->command_pool, this->graphics_queue, staging_buffer, this->compute.storage_buffer, buffer_size);
+
+	vkDestroyBuffer(this->device, staging_buffer, nullptr);
+	vkFreeMemory(this->device, staging_buffer_memory, nullptr);
+
+	// Create Compute UBO Buffer 
+	if (!helper::create_buffer(
+		this->device,
+		this->physical_device,
+		sizeof(compute.ubo),
+		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+		this->compute.ubo_buffer,
+		this->compute.storage_buffer_memory))
+	{
+		return false;
+	}
+
+	// Buffers Descriptors
+	this->compute.storage_buffer_descriptor.buffer = this->compute.storage_buffer;
+	this->compute.storage_buffer_descriptor.offset = 0;
+	this->compute.storage_buffer_descriptor.range = buffer_size;
+
+	this->compute.ubo_buffer_descriptor.buffer = this->compute.ubo_buffer;
+	this->compute.ubo_buffer_descriptor.offset = 0;
+	this->compute.ubo_buffer_descriptor.range = sizeof(this->compute.ubo);
+
 	return true;
 }
 
@@ -1869,47 +1851,59 @@ bool CircleCollisionComputeShader::create_compute_command_buffers()
 	// Record Command Buffer
 
 	// WAIT FOR VERTEX SHADER READ
-	VkBufferMemoryBarrier barrier = {};
-	barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
-	barrier.buffer = this->compute.storage_buffer;
-	barrier.offset = this->compute.storage_buffer_descriptor.offset;
-	barrier.size = this->compute.storage_buffer_descriptor.range;
-	barrier.srcAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
-	barrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT; // ??
-	barrier.srcQueueFamilyIndex = this->family_indices.graphics_family.value();
-	barrier.dstQueueFamilyIndex = this->family_indices.compute_family.value();
+	VkCommandBufferBeginInfo begin_info{};
+	begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
-	vkCmdPipelineBarrier(
-		this->compute.command_buffer,
-		VK_SHADER_STAGE_VERTEX_BIT,
-		VK_SHADER_STAGE_COMPUTE_BIT,
-		0, // No Flags
-		0, nullptr,
-		1, &barrier,
-		0, nullptr);
+	if (vkBeginCommandBuffer(this->compute.command_buffer, &begin_info) != VK_SUCCESS)
+		return false;
 
-	// WAIT FOR COMPUTE SHADER WRITE
-	barrier.buffer = this->compute.storage_buffer;
-	barrier.offset = this->compute.storage_buffer_descriptor.offset;
-	barrier.size = this->compute.storage_buffer_descriptor.range;
-	barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-	barrier.dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
-	barrier.srcQueueFamilyIndex = this->family_indices.compute_family.value();
-	barrier.dstQueueFamilyIndex = this->family_indices.graphics_family.value();
+	{
+		VkBufferMemoryBarrier barrier = {};
+		barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+		barrier.buffer = this->compute.storage_buffer;
+		barrier.offset = this->compute.storage_buffer_descriptor.offset;
+		barrier.size = this->compute.storage_buffer_descriptor.range;
+		barrier.srcAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
+		barrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT; // ??
+		barrier.srcQueueFamilyIndex = this->family_indices.graphics_family.value();
+		barrier.dstQueueFamilyIndex = this->family_indices.compute_family.value();
 
-	vkCmdBindPipeline(this->compute.command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE,this->compute.pipeline);
-	vkCmdBindDescriptorSets(this->compute.command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, compute.pipeline_layout, 0, 1, &this->compute.descriptor_set, 0, 0);
+		vkCmdPipelineBarrier(
+			this->compute.command_buffer,
+			VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			0, // No Flags
+			0, nullptr,
+			1, &barrier,
+			0, nullptr);
 
-	// Dispatch the compute job
+		// WAIT FOR COMPUTE SHADER WRITE
+		barrier.buffer = this->compute.storage_buffer;
+		barrier.offset = this->compute.storage_buffer_descriptor.offset;
+		barrier.size = this->compute.storage_buffer_descriptor.range;
+		barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+		barrier.dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
+		barrier.srcQueueFamilyIndex = this->family_indices.compute_family.value();
+		barrier.dstQueueFamilyIndex = this->family_indices.graphics_family.value();
 
-	vkCmdPipelineBarrier(
-		this->compute.command_buffer,
-		VK_SHADER_STAGE_COMPUTE_BIT,
-		VK_SHADER_STAGE_VERTEX_BIT,
-		0, // No Flags
-		0, nullptr,
-		1, &barrier,
-		0, nullptr);
+		vkCmdBindPipeline(this->compute.command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, this->compute.pipeline);
+		vkCmdBindDescriptorSets(this->compute.command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, compute.pipeline_layout, 0, 1, &this->compute.descriptor_set, 0, 0);
+
+		// Dispatch the compute job
+		vkCmdDispatch(compute.command_buffer, instance_count / 256, 1, 1);
+
+		vkCmdPipelineBarrier(
+			this->compute.command_buffer,
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
+			0, // No Flags
+			0, nullptr,
+			1, &barrier,
+			0, nullptr);
+	}
+
+	if (vkEndCommandBuffer(this->compute.command_buffer) != VK_SUCCESS)
+		return false;
 
 	return true;
 }
@@ -1932,6 +1926,16 @@ bool CircleCollisionComputeShader::release()
 
 	if (this->device)
 	{
+		// Compute
+		vkDestroyBuffer(this->device, this->compute.ubo_buffer, nullptr);
+		vkFreeMemory(this->device, this->compute.ubo_buffer_memory, nullptr);
+		vkDestroyPipeline(this->device, this->compute.pipeline, nullptr);
+		vkDestroyPipelineLayout(this->device, this->compute.pipeline_layout, nullptr);
+		vkDestroyFence(this->device, this->compute.fence, nullptr);
+		vkDestroyCommandPool(this->device, this->compute.command_pool, nullptr);
+		vkDestroyDescriptorSetLayout(this->device, this->compute.descriptor_set_layout, nullptr);
+
+		// Graphics
 		vkDestroyBuffer(this->device, this->vertex_buffer, nullptr);
 		vkFreeMemory(this->device, this->vertex_buffer_memory, nullptr);
 

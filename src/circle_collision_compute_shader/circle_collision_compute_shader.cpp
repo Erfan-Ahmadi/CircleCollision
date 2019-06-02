@@ -22,7 +22,7 @@ constexpr int INIT_HEIGHT = 720;
 
 constexpr uint64_t	instance_count = (1 << 10);
 constexpr float		relative_velocity = 0.1f;
-constexpr float		relative_scale = 0.1f;
+constexpr float		relative_scale = 1.0f;
 
 constexpr bool mouse_bounding_enabled = false;
 constexpr bool mouse_drawing_enabled = true;
@@ -379,7 +379,7 @@ bool CircleCollisionComputeShader::setup_vulkan()
 		return false;
 	if (!create_instance_buffers())
 		return false;
-	if (!create_uniform_buffers())
+	if (!create_mvp_uniform_buffers())
 		return false;
 	if (!create_descriptor_pool())
 		return false;
@@ -934,7 +934,7 @@ bool CircleCollisionComputeShader::create_graphics_pipeline()
 
 	std::vector<VkVertexInputBindingDescription> bindings =
 	{
-		initializers::vertex_input_binding_description(VERTEX_BUFFER_BIND_ID, sizeof(Vertex), VK_VERTEX_INPUT_RATE_VERTEX),
+		initializers::vertex_input_binding_description(VERTEX_BUFFER_BIND_ID, sizeof(vertex), VK_VERTEX_INPUT_RATE_VERTEX),
 		initializers::vertex_input_binding_description(COLOR_BUFFER_BIND_ID, sizeof(glm::vec3), VK_VERTEX_INPUT_RATE_INSTANCE),
 		initializers::vertex_input_binding_description(POSITIONS_BUFFER_BIND_ID, sizeof(glm::vec2), VK_VERTEX_INPUT_RATE_INSTANCE),
 		initializers::vertex_input_binding_description(SCALE_BUFFER_BIND_ID, sizeof(float), VK_VERTEX_INPUT_RATE_INSTANCE),
@@ -942,7 +942,7 @@ bool CircleCollisionComputeShader::create_graphics_pipeline()
 
 	std::vector<VkVertexInputAttributeDescription> attributes =
 	{
-		initializers::vertex_input_attribute_description(VERTEX_BUFFER_BIND_ID,		0, VK_FORMAT_R32G32_SFLOAT, offsetof(Vertex, pos)),
+		initializers::vertex_input_attribute_description(VERTEX_BUFFER_BIND_ID,		0, VK_FORMAT_R32G32_SFLOAT, offsetof(vertex, pos)),
 		initializers::vertex_input_attribute_description(POSITIONS_BUFFER_BIND_ID,	1, VK_FORMAT_R32G32_SFLOAT, 0),
 		initializers::vertex_input_attribute_description(COLOR_BUFFER_BIND_ID,		2, VK_FORMAT_R32G32B32_SFLOAT, 0),
 		initializers::vertex_input_attribute_description(SCALE_BUFFER_BIND_ID,		3, VK_FORMAT_R32_SFLOAT, 0),
@@ -1075,7 +1075,7 @@ bool CircleCollisionComputeShader::create_graphics_pipeline()
 bool CircleCollisionComputeShader::create_vertex_buffer()
 {
 	get_circle_model(30, &this->circle_model);
-	const VkDeviceSize buffer_size = sizeof(Vertex) * this->circle_model.vertices.size();
+	const VkDeviceSize buffer_size = sizeof(vertex) * this->circle_model.vertices.size();
 
 	VkBuffer staging_buffer;
 	VkDeviceMemory staging_buffer_memory;
@@ -1167,13 +1167,11 @@ bool CircleCollisionComputeShader::create_instance_buffers()
 
 	if (!create_colors_buffer())
 		return false;
-	if (!create_scales_buffer())
-		return false;
 
 	return true;
 }
 
-bool CircleCollisionComputeShader::create_uniform_buffers()
+bool CircleCollisionComputeShader::create_mvp_uniform_buffers()
 {
 	const auto buffer_size = sizeof(UniformBufferObject);
 
@@ -1204,14 +1202,14 @@ bool CircleCollisionComputeShader::create_descriptor_pool()
 	std::vector<VkDescriptorPoolSize> pool_sizes =
 	{
 		{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, static_cast<uint32_t>(this->swap_chain_images.size() + 1)}, // GRAPHICS UBO + 1 For COMPUTE
-		{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1}, // COMPUTE SB
+		{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3}, // COMPUTE SB
 	};
 
 	VkDescriptorPoolCreateInfo pool_info = {};
 	pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	pool_info.poolSizeCount = static_cast<uint32_t>(pool_sizes.size());
 	pool_info.pPoolSizes = pool_sizes.data();
-	pool_info.maxSets = static_cast<uint32_t>(this->swap_chain_images.size() + 1);
+	pool_info.maxSets = static_cast<uint32_t>(this->swap_chain_images.size() + 3);
 
 	if (vkCreateDescriptorPool(this->device, &pool_info, nullptr, &this->descriptor_pool) != VK_SUCCESS)
 	{
@@ -1350,8 +1348,8 @@ bool CircleCollisionComputeShader::create_command_buffers()
 
 			VkBuffer vertex_buffers[] = { this->vertex_buffer };
 			VkBuffer colors_buffers[] = { this->colors_buffer };
-			VkBuffer positions_buffers[] = { this->compute.storage_buffer };
-			VkBuffer scales_buffers[] = { this->scales_buffer };
+			VkBuffer positions_buffers[] = { this->compute.position_buffer.buffer };
+			VkBuffer scales_buffers[] = { this->compute.scales_buffer.buffer };
 			VkDeviceSize offsets[] = { 0 };
 
 			// Circles
@@ -1479,7 +1477,7 @@ bool CircleCollisionComputeShader::recreate_swap_chain()
 		return false;
 	if (!create_frame_buffers())
 		return false;
-	if (!create_uniform_buffers())
+	if (!create_mvp_uniform_buffers())
 		return false;
 	if (!create_descriptor_pool())
 		return false;
@@ -1537,10 +1535,10 @@ void CircleCollisionComputeShader::update(const uint32_t& current_image)
 	// Compute UBO Update
 	this->compute.ubo.count = instance_count;
 	this->compute.ubo.dt = this->frame_timer;
-	
-	vkMapMemory(this->device, this->compute.ubo_buffer_memory, 0, sizeof(this->compute.ubo), 0, &data);
+
+	vkMapMemory(this->device, this->compute.ubo_buffer.device_memory, 0, sizeof(this->compute.ubo), 0, &data);
 	memcpy(data, &this->compute.ubo, sizeof(this->compute.ubo));
-	vkUnmapMemory(this->device, this->compute.ubo_buffer_memory);
+	vkUnmapMemory(this->device, this->compute.ubo_buffer.device_memory);
 
 	// Graphics UBO Update
 	UniformBufferObject ubo = {};
@@ -1698,7 +1696,9 @@ bool CircleCollisionComputeShader::prepare_compute()
 	std::vector<VkDescriptorSetLayoutBinding> bindings =
 	{
 		{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
-		{1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}
+		{1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
+		{2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
+		{3, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}
 	};
 
 	VkDescriptorSetLayoutCreateInfo compute_descriptor_set_layout = {};
@@ -1739,13 +1739,25 @@ bool CircleCollisionComputeShader::prepare_compute()
 			this->compute.descriptor_set,
 			VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
 			0,
-			&this->compute.storage_buffer_descriptor),
-		// Binding 1 : Uniform buffer
+			&this->compute.position_buffer.get_descriptor_info()),
+		// Binding 1 : Scales storage buffer
+		initializers::write_descriptors_set(
+			this->compute.descriptor_set,
+			VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+			1,
+			&this->compute.scales_buffer.get_descriptor_info()),
+		// Binding 2 : Velocities storage buffer
+		initializers::write_descriptors_set(
+			this->compute.descriptor_set,
+			VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+			2,
+			&this->compute.velocities_buffer.get_descriptor_info()),
+		// Binding 3 : Uniform buffer
 		initializers::write_descriptors_set(
 			this->compute.descriptor_set,
 			VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-			1,
-			&this->compute.ubo_buffer_descriptor)
+			3,
+			&this->compute.ubo_buffer.get_descriptor_info())
 	};
 
 	vkUpdateDescriptorSets(this->device, static_cast<uint32_t>(compute_write_descriptor_sets.size()), compute_write_descriptor_sets.data(), 0, NULL);
@@ -1783,9 +1795,21 @@ bool CircleCollisionComputeShader::prepare_compute()
 
 bool CircleCollisionComputeShader::prepare_compute_buffers()
 {
-	// Create Storage Buffer
+	if (!create_compute_positions_buffer())
+		return false;
+	if (!create_compute_scales_buffer())
+		return false;
+	if (!create_compute_velocities_buffer())
+		return false;
+	if (!create_compute_ubo_buffer())
+		return false;
+	return true;
+}
 
-	const VkDeviceSize buffer_size = sizeof(glm::vec2) * instance_count;
+bool CircleCollisionComputeShader::create_compute_positions_buffer()
+{
+	this->compute.position_buffer.offset = 0;
+	this->compute.position_buffer.size = sizeof(glm::vec2) * instance_count;
 
 	VkBuffer staging_buffer;
 	VkDeviceMemory staging_buffer_memory;
@@ -1793,7 +1817,7 @@ bool CircleCollisionComputeShader::prepare_compute_buffers()
 	if (!helper::create_buffer(
 		this->device,
 		this->physical_device,
-		buffer_size,
+		this->compute.position_buffer.size,
 		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 		staging_buffer,
@@ -1803,50 +1827,155 @@ bool CircleCollisionComputeShader::prepare_compute_buffers()
 	}
 
 	void* data;
-	vkMapMemory(this->device, staging_buffer_memory, 0, buffer_size, 0, &data);
-	memcpy(data, this->circles.positions.data(), (size_t)buffer_size);
+	vkMapMemory(this->device, staging_buffer_memory, 0, this->compute.position_buffer.size, 0, &data);
+	memcpy(data, this->circles.positions.data(), static_cast<size_t>(this->compute.position_buffer.size));
 	vkUnmapMemory(this->device, staging_buffer_memory);
 
 	if (!helper::create_buffer(
 		this->device,
 		this->physical_device,
-		buffer_size,
+		this->compute.position_buffer.size,
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-		this->compute.storage_buffer,
-		this->compute.storage_buffer_memory))
+		this->compute.position_buffer.buffer,
+		this->compute.position_buffer.device_memory))
 	{
 		return false;
 	}
 
-	helper::copy_buffer(this->device, this->command_pool, this->graphics_queue, staging_buffer, this->compute.storage_buffer, buffer_size);
+	helper::copy_buffer(
+		this->device,
+		this->command_pool,
+		this->graphics_queue,
+		staging_buffer,
+		this->compute.position_buffer.buffer,
+		this->compute.position_buffer.size);
 
 	vkDestroyBuffer(this->device, staging_buffer, nullptr);
 	vkFreeMemory(this->device, staging_buffer_memory, nullptr);
 
-	// --------------------------------
+	return true;
+}
+
+bool CircleCollisionComputeShader::create_compute_scales_buffer()
+{
+	this->compute.scales_buffer.offset = 0;
+	this->compute.scales_buffer.size = sizeof(float) * instance_count;
+
+	VkBuffer staging_buffer;
+	VkDeviceMemory staging_buffer_memory;
+
+	if (!helper::create_buffer(
+		this->device,
+		this->physical_device,
+		this->compute.scales_buffer.size,
+		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+		staging_buffer,
+		staging_buffer_memory))
+	{
+		return false;
+	}
+
+	void* data;
+	vkMapMemory(this->device, staging_buffer_memory, 0, this->compute.scales_buffer.size, 0, &data);
+	memcpy(data, this->circles.scales.data(), static_cast<size_t>(this->compute.scales_buffer.size));
+	vkUnmapMemory(this->device, staging_buffer_memory);
+
+	if (!helper::create_buffer(
+		this->device,
+		this->physical_device,
+		this->compute.scales_buffer.size,
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+		this->compute.scales_buffer.buffer,
+		this->compute.scales_buffer.device_memory))
+	{
+		return false;
+	}
+
+	helper::copy_buffer(
+		this->device,
+		this->command_pool,
+		this->graphics_queue,
+		staging_buffer,
+		this->compute.scales_buffer.buffer,
+		this->compute.scales_buffer.size);
+
+	vkDestroyBuffer(this->device, staging_buffer, nullptr);
+	vkFreeMemory(this->device, staging_buffer_memory, nullptr);
+
+	return true;
+}
+
+bool CircleCollisionComputeShader::create_compute_velocities_buffer()
+{
+	this->compute.velocities_buffer.offset = 0;
+	this->compute.velocities_buffer.size = sizeof(glm::vec2) * instance_count;
+
+	VkBuffer staging_buffer;
+	VkDeviceMemory staging_buffer_memory;
+
+	if (!helper::create_buffer(
+		this->device,
+		this->physical_device,
+		this->compute.velocities_buffer.size,
+		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+		staging_buffer,
+		staging_buffer_memory))
+	{
+		return false;
+	}
+
+	void* data;
+	vkMapMemory(this->device, staging_buffer_memory, 0, this->compute.velocities_buffer.size, 0, &data);
+	memcpy(data, this->circles.velocities.data(), static_cast<size_t>(this->compute.velocities_buffer.size));
+	vkUnmapMemory(this->device, staging_buffer_memory);
+
+	if (!helper::create_buffer(
+		this->device,
+		this->physical_device,
+		this->compute.velocities_buffer.size,
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+		this->compute.velocities_buffer.buffer,
+		this->compute.velocities_buffer.device_memory))
+	{
+		return false;
+	}
+
+	helper::copy_buffer(
+		this->device,
+		this->command_pool,
+		this->graphics_queue,
+		staging_buffer,
+		this->compute.velocities_buffer.buffer,
+		this->compute.velocities_buffer.size);
+
+	vkDestroyBuffer(this->device, staging_buffer, nullptr);
+	vkFreeMemory(this->device, staging_buffer_memory, nullptr);
+
+	return true;
+}
+
+bool CircleCollisionComputeShader::create_compute_ubo_buffer()
+{
+	this->compute.ubo_buffer.offset = 0;
+	this->compute.ubo_buffer.size = sizeof(compute.ubo);
 
 	// Create Compute UBO Buffer 
 	if (!helper::create_buffer(
 		this->device,
 		this->physical_device,
-		sizeof(compute.ubo),
+		this->compute.ubo_buffer.size,
 		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-		this->compute.ubo_buffer,
-		this->compute.ubo_buffer_memory))
+		this->compute.ubo_buffer.buffer,
+		this->compute.ubo_buffer.device_memory))
 	{
 		return false;
 	}
-
-	// Buffers Descriptors
-	this->compute.storage_buffer_descriptor.buffer = this->compute.storage_buffer;
-	this->compute.storage_buffer_descriptor.offset = 0;
-	this->compute.storage_buffer_descriptor.range = buffer_size;
-
-	this->compute.ubo_buffer_descriptor.buffer = this->compute.ubo_buffer;
-	this->compute.ubo_buffer_descriptor.offset = 0;
-	this->compute.ubo_buffer_descriptor.range = sizeof(this->compute.ubo);
 
 	return true;
 }
@@ -1882,9 +2011,9 @@ bool CircleCollisionComputeShader::create_compute_command_buffers()
 	{
 		VkBufferMemoryBarrier barrier = {};
 		barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
-		barrier.buffer = this->compute.storage_buffer;
-		barrier.offset = this->compute.storage_buffer_descriptor.offset;
-		barrier.size = this->compute.storage_buffer_descriptor.range;
+		barrier.buffer = this->compute.position_buffer.buffer;
+		barrier.offset = this->compute.position_buffer.offset;
+		barrier.size = this->compute.position_buffer.size;
 		barrier.srcAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
 		barrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT; // ??
 		barrier.srcQueueFamilyIndex = this->family_indices.graphics_family.value();
@@ -1900,9 +2029,9 @@ bool CircleCollisionComputeShader::create_compute_command_buffers()
 			0, nullptr);
 
 		// WAIT FOR COMPUTE SHADER WRITE
-		barrier.buffer = this->compute.storage_buffer;
-		barrier.offset = this->compute.storage_buffer_descriptor.offset;
-		barrier.size = this->compute.storage_buffer_descriptor.range;
+		barrier.buffer = this->compute.position_buffer.buffer;
+		barrier.offset = this->compute.position_buffer.offset;
+		barrier.size = this->compute.position_buffer.size;
 		barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
 		barrier.dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
 		barrier.srcQueueFamilyIndex = this->family_indices.compute_family.value();
@@ -1912,7 +2041,7 @@ bool CircleCollisionComputeShader::create_compute_command_buffers()
 		vkCmdBindDescriptorSets(this->compute.command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, compute.pipeline_layout, 0, 1, &this->compute.descriptor_set, 0, 0);
 
 		// Dispatch the compute job
-		vkCmdDispatch(compute.command_buffer, instance_count / 128, 1, 1);
+		vkCmdDispatch(compute.command_buffer, instance_count / 64, 1, 1);
 
 		vkCmdPipelineBarrier(
 			this->compute.command_buffer,
@@ -1949,11 +2078,12 @@ bool CircleCollisionComputeShader::release()
 	if (this->device)
 	{
 		// Compute
-		vkDestroyBuffer(this->device, this->compute.ubo_buffer, nullptr);
-		vkFreeMemory(this->device, this->compute.ubo_buffer_memory, nullptr);
+		compute.ubo_buffer.destroy(this->device);
+		compute.position_buffer.destroy(this->device);
+
 		vkDestroyPipeline(this->device, this->compute.pipeline, nullptr);
 		vkDestroyPipelineLayout(this->device, this->compute.pipeline_layout, nullptr);
-		vkDestroyFence(this->device, this->compute.fence, nullptr);
+		//vkDestroyFence(this->device, this->compute.fence, nullptr);
 		vkDestroyCommandPool(this->device, this->compute.command_pool, nullptr);
 		vkDestroyDescriptorSetLayout(this->device, this->compute.descriptor_set_layout, nullptr);
 
@@ -1966,9 +2096,6 @@ bool CircleCollisionComputeShader::release()
 
 		vkDestroyBuffer(this->device, this->colors_buffer, nullptr);
 		vkFreeMemory(this->device, this->colors_buffer_memory, nullptr);
-
-		vkDestroyBuffer(this->device, this->scales_buffer, nullptr);
-		vkFreeMemory(this->device, this->scales_buffer_memory, nullptr);
 
 		cleanup_swap_chain();
 
@@ -2027,50 +2154,6 @@ bool CircleCollisionComputeShader::create_colors_buffer()
 	return true;
 }
 
-bool CircleCollisionComputeShader::create_scales_buffer()
-{
-	const VkDeviceSize buffer_size = sizeof(float) * instance_count;
-
-	VkBuffer staging_buffer;
-	VkDeviceMemory staging_buffer_memory;
-
-	if (!helper::create_buffer(
-		this->device,
-		this->physical_device,
-		buffer_size,
-		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-		staging_buffer,
-		staging_buffer_memory))
-	{
-		return false;
-	}
-
-	void* data = nullptr;
-	vkMapMemory(this->device, staging_buffer_memory, 0, buffer_size, 0, &data);
-	memcpy(data, this->circles.scales.data(), buffer_size);
-	vkUnmapMemory(this->device, staging_buffer_memory);
-
-	if (!helper::create_buffer(
-		this->device,
-		this->physical_device,
-		buffer_size,
-		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-		this->scales_buffer,
-		this->scales_buffer_memory))
-	{
-		return false;
-	}
-
-	helper::copy_buffer(this->device, this->command_pool, this->graphics_queue, staging_buffer, this->scales_buffer, buffer_size);
-
-	vkDestroyBuffer(this->device, staging_buffer, nullptr);
-	vkFreeMemory(this->device, staging_buffer_memory, nullptr);
-
-	return true;
-}
-
 void CircleCollisionComputeShader::setup_circles()
 {
 	this->circles.resize(instance_count);
@@ -2080,13 +2163,13 @@ void CircleCollisionComputeShader::setup_circles()
 
 	for (size_t i = 0; i < instance_count; ++i)
 	{
-		this->circles.scales[i] = 10;// min_size + (rand() % (max_size - min_size));
-		this->circles.velocities[i] = relative_velocity * glm::vec2(((rand() % 100) / 200.0f) * ((rand() % 2) * 2 - 1.0f), (rand() % 100) / 200.0f * ((rand() % 2) * 2 - 1.0f)) / glm::sqrt(this->circles.scales[i]) * 3.0f;
-		//this->circles.positions[i] = glm::vec2(
-		//	this->circles.scales[i] + rand() % (INIT_WIDTH - 2 * static_cast<int>(this->circles.scales[i])),
-		//	this->circles.scales[i] + rand() % (INIT_HEIGHT - 2 * static_cast<int>(this->circles.scales[i])));
+		this->circles.scales[i] = min_size + (rand() % (max_size - min_size));
 
-		this->circles.positions[i] = glm::vec2(i * 1 + 0, 100);
+		this->circles.velocities[i] = relative_velocity * glm::vec2(((rand() % 100) / 200.0f) * ((rand() % 2) * 2 - 1.0f), (rand() % 100) / 200.0f * ((rand() % 2) * 2 - 1.0f)) / glm::sqrt(this->circles.scales[i]) * 3.0f;
+
+		this->circles.positions[i] = glm::vec2(
+			this->circles.scales[i] + rand() % (INIT_WIDTH - 2 * static_cast<int>(this->circles.scales[i])),
+			this->circles.scales[i] + rand() % (INIT_HEIGHT - 2 * static_cast<int>(this->circles.scales[i])));
 
 		this->circles.colors[i] = glm::vec3((rand() % 255) / 255.0f, (rand() % 255) / 255.0f, (rand() % 255) / 255.0f);
 	}

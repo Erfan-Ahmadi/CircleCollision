@@ -5,10 +5,22 @@ layout (local_size_x = 64) in;
 // Binding 0 : Position storage buffer
 layout(binding = 0) buffer Pos 
 {
-   vec2 positions[];
+	vec2 positions[];
 };
 
-layout (binding = 1) uniform UBO 
+// Binding 1 : Scales storage buffer
+layout(binding = 1) readonly buffer Scales 
+{
+	float scales[];
+};
+
+// Binding 2 : Velocities storage buffer
+layout(binding = 2) buffer Vel
+{
+	vec2 velocities[];
+};
+
+layout (binding = 3) uniform UBO 
 {
 	float dt;
 	int count;
@@ -20,6 +32,6 @@ void main()
     if (index >= ubo.count) 
 		return;
 
-	positions[index] += vec2(0, ubo.dt * 0.1f);
+	positions[index] += velocities[index] * ubo.dt;
 }
 

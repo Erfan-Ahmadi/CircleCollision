@@ -56,7 +56,7 @@ namespace helper
 	VkShaderModule create_shader_module(VkDevice device, const std::vector<char>& code);
 };
 
-struct Vertex
+struct vertex
 {
 	glm::vec2 pos;
 	glm::vec3 color;
@@ -64,8 +64,31 @@ struct Vertex
 
 struct model
 {
-	std::vector<Vertex> vertices;
+	std::vector<vertex> vertices;
 	std::vector<uint16_t> indices;
+};
+
+struct buffer
+{
+	VkBuffer buffer;
+	VkDeviceMemory device_memory;
+	VkDeviceSize offset;
+	VkDeviceSize size;
+
+	VkDescriptorBufferInfo get_descriptor_info()
+	{
+		VkDescriptorBufferInfo info = {};
+		info.buffer = this->buffer;
+		info.offset = offset;
+		info.range = size;
+		return info;
+	}
+
+	void destroy(const VkDevice& device)
+	{
+		vkDestroyBuffer(device, this->buffer, nullptr);
+		vkFreeMemory(device, this->device_memory, nullptr);
+	}
 };
 
 struct SwapChainSupportDetails
@@ -129,7 +152,7 @@ private:
 	bool create_vertex_buffer(); //
 	bool create_index_buffer(); //
 	bool create_instance_buffers(); //
-	bool create_uniform_buffers(); //
+	bool create_mvp_uniform_buffers(); //
 	bool create_descriptor_pool();
 	bool create_descriptor_sets();
 	bool create_frame_buffers();
@@ -138,8 +161,6 @@ private:
 	bool create_sync_objects();
 
 	bool create_colors_buffer(); //
-	// bool create_positions_buffer(); // in prepare_compute_buffers()
-	bool create_scales_buffer(); // 
 
 	bool cleanup_swap_chain();
 	bool recreate_swap_chain();
@@ -154,9 +175,13 @@ private:
 	// Compute
 	bool prepare_compute();
 	bool prepare_compute_buffers();
+	bool create_compute_positions_buffer();
+	bool create_compute_scales_buffer();
+	bool create_compute_velocities_buffer();
+	bool create_compute_ubo_buffer();
 	bool create_compute_command_buffers();
-	
-// TODO: Consider more than 1 swapchain image
+
+	// TODO: Consider more than 1 swapchain image
 	struct
 	{
 		VkDescriptorSetLayout descriptor_set_layout;
@@ -169,13 +194,10 @@ private:
 		VkPipelineLayout pipeline_layout;
 		VkPipeline pipeline;
 
-		VkBuffer ubo_buffer;
-		VkDeviceMemory ubo_buffer_memory;
-		VkDescriptorBufferInfo ubo_buffer_descriptor;
-
-		VkBuffer storage_buffer;
-		VkDeviceMemory storage_buffer_memory;
-		VkDescriptorBufferInfo storage_buffer_descriptor;
+		buffer ubo_buffer;
+		buffer position_buffer;
+		buffer scales_buffer;
+		buffer velocities_buffer;
 
 		struct
 		{
@@ -199,9 +221,6 @@ private:
 
 	VkBuffer colors_buffer;
 	VkDeviceMemory colors_buffer_memory;
-
-	VkBuffer scales_buffer;
-	VkDeviceMemory scales_buffer_memory;
 
 	std::vector<VkBuffer> ubo_buffers;
 	std::vector<VkDeviceMemory> ubo_buffers_memory;

@@ -12,15 +12,12 @@
 #define GetCurrentDir _getcwd
 #endif
 
-constexpr int INIT_WIDTH = 1600;
-constexpr int INIT_HEIGHT = 900;
-
 #define VERTEX_BUFFER_BIND_ID				0 // PER VERTEX
 #define COLOR_BUFFER_BIND_ID				1 // PER INSTANCE
 #define POSITIONS_BUFFER_BIND_ID			2 // PER INSTANCE
 #define SCALE_BUFFER_BIND_ID				3 // PER INSTANCE
 
-constexpr float		relative_velocity = 0.1f;
+constexpr float		relative_velocity = 0.0f;
 constexpr float		relative_scale = 1.0f;
 
 constexpr bool mouse_bounding_enabled = false;

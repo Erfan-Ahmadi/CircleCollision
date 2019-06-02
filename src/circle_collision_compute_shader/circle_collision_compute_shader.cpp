@@ -12,9 +12,6 @@
 #define GetCurrentDir _getcwd
 #endif
 
-constexpr int INIT_WIDTH = 1600;
-constexpr int INIT_HEIGHT = 900;
-
 #define VERTEX_BUFFER_BIND_ID				0 // PER VERTEX
 #define COLOR_BUFFER_BIND_ID				1 // PER INSTANCE
 #define POSITIONS_BUFFER_BIND_ID			2 // PER INSTANCE

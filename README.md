@@ -7,6 +7,13 @@ Implementing Different Methods of Circle to Circle Collision Detection using Vul
 
 I'll be refering to the simplest collision detection algorithm which has two nested "for"'s **Double For Algorithm**  
 
+# Images and Preview
+
+<p align="center">
+ <img src="https://raw.githubusercontent.com/Erfan-Ahmadi/circle_collision/master/docs/heart_collision.jpg" alt="" width="320" height="180" />
+ <img src="https://raw.githubusercontent.com/Erfan-Ahmadi/circle_collision/master/docs/draw-fun.gif" alt="" width="320" height="180" />
+</p>
+
 # Motivation
 
 This Project Is For Learning Purposes of Following Topics
@@ -26,12 +33,6 @@ With Collision Detection MEthods:
 
 **This NOT a benchmark, Although It would give me some ideas and thing to be suspicius about.
 And also I would appreciate optimization ideas and results on your system.**
-
-# Images
-
- <img src="https://raw.githubusercontent.com/Erfan-Ahmadi/circle_collision/master/docs/heart_collision.jpg" alt="" width="640" height="360" />
- <img src="https://raw.githubusercontent.com/Erfan-Ahmadi/circle_collision/master/docs/draw-fun.gif" alt="" width="640" height="360" />
-
 
 # Features
 

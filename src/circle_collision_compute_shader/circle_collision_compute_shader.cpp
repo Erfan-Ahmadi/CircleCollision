@@ -22,7 +22,7 @@ constexpr int INIT_HEIGHT = 720;
 
 constexpr uint64_t	instance_count = (1 << 10);
 constexpr float		relative_velocity = 0.1f;
-constexpr float		relative_scale = 1.0f;
+constexpr float		relative_scale = 0.1f;
 
 constexpr bool mouse_bounding_enabled = false;
 constexpr bool mouse_drawing_enabled = true;
@@ -1912,7 +1912,7 @@ bool CircleCollisionComputeShader::create_compute_command_buffers()
 		vkCmdBindDescriptorSets(this->compute.command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, compute.pipeline_layout, 0, 1, &this->compute.descriptor_set, 0, 0);
 
 		// Dispatch the compute job
-		vkCmdDispatch(compute.command_buffer, instance_count / 256, 1, 1);
+		vkCmdDispatch(compute.command_buffer, instance_count / 128, 1, 1);
 
 		vkCmdPipelineBarrier(
 			this->compute.command_buffer,
@@ -2080,13 +2080,13 @@ void CircleCollisionComputeShader::setup_circles()
 
 	for (size_t i = 0; i < instance_count; ++i)
 	{
-		this->circles.scales[i] = min_size + (rand() % (max_size - min_size));
+		this->circles.scales[i] = 10;// min_size + (rand() % (max_size - min_size));
 		this->circles.velocities[i] = relative_velocity * glm::vec2(((rand() % 100) / 200.0f) * ((rand() % 2) * 2 - 1.0f), (rand() % 100) / 200.0f * ((rand() % 2) * 2 - 1.0f)) / glm::sqrt(this->circles.scales[i]) * 3.0f;
 		//this->circles.positions[i] = glm::vec2(
 		//	this->circles.scales[i] + rand() % (INIT_WIDTH - 2 * static_cast<int>(this->circles.scales[i])),
 		//	this->circles.scales[i] + rand() % (INIT_HEIGHT - 2 * static_cast<int>(this->circles.scales[i])));
 
-		this->circles.positions[i] = glm::vec2(0, 0);
+		this->circles.positions[i] = glm::vec2(i * 1 + 0, 100);
 
 		this->circles.colors[i] = glm::vec3((rand() % 255) / 255.0f, (rand() % 255) / 255.0f, (rand() % 255) / 255.0f);
 	}

@@ -1,9 +1,9 @@
 #version 450
 
-layout (local_size_x = 256) in;
+layout (local_size_x = 64) in;
 
 // Binding 0 : Position storage buffer
-layout(std140, binding = 0) buffer Pos 
+layout(binding = 0) buffer Pos 
 {
    vec2 positions[];
 };
@@ -20,6 +20,6 @@ void main()
     if (index >= ubo.count) 
 		return;
 
-	positions[index] += vec2(index, 100) * ubo.dt / 1000.0f;
+	positions[index] += vec2(0, ubo.dt * 0.1f);
 }
 

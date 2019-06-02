@@ -190,7 +190,6 @@ private:
 	void setup_circles();
 	circles_strcut circles;
 
-
 	VkBuffer vertex_buffer;
 	VkDeviceMemory vertex_buffer_memory;
 

@@ -1427,6 +1427,14 @@ bool CircleCollisionComputeShader::cleanup_swap_chain()
 
 	vkDestroySwapchainKHR(this->device, this->swap_chain, nullptr);
 
+
+	for (auto i = 0; i < this->num_frames; ++i)
+	{
+		vkDestroySemaphore(this->device, this->image_available_semaphore[i], nullptr);
+		vkDestroySemaphore(this->device, this->render_finished_semaphore[i], nullptr);
+		vkDestroyFence(this->device, this->draw_fences[i], nullptr);
+	}
+
 	for (size_t i = 0; i < this->swap_chain_images.size(); ++i)
 	{
 		vkDestroyBuffer(this->device, this->ubo_buffers[i], nullptr);
@@ -1469,6 +1477,8 @@ bool CircleCollisionComputeShader::recreate_swap_chain()
 	if (!create_descriptor_sets())
 		return false;
 	if (!create_command_buffers())
+		return false;
+	if (!create_sync_objects())
 		return false;
 
 	return true;
@@ -1957,13 +1967,6 @@ bool CircleCollisionComputeShader::release()
 
 		vkDestroyPipeline(this->device, this->graphics_pipeline, nullptr);
 		vkDestroyPipelineLayout(this->device, this->pipeline_layout, nullptr);
-
-		for (auto i = 0; i < this->num_frames; ++i)
-		{
-			vkDestroySemaphore(this->device, this->image_available_semaphore[i], nullptr);
-			vkDestroySemaphore(this->device, this->render_finished_semaphore[i], nullptr);
-			vkDestroyFence(this->device, this->draw_fences[i], nullptr);
-		}
 
 		vkDestroyCommandPool(this->device, this->command_pool, nullptr);
 

@@ -23,6 +23,7 @@
     <ProjectGuid>{3C30986F-0604-455D-B5C4-B7F00EA88BB2}</ProjectGuid>
     <RootNamespace>circlecollisioncomputeshader</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <ProjectName>simple_compute_shader</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">

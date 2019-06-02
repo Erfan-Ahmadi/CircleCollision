@@ -23,6 +23,7 @@
     <ProjectGuid>{40FD6623-F659-45ED-9ED5-AD2119795132}</ProjectGuid>
     <RootNamespace>circlecollisionsimple</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <ProjectName>simple</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">

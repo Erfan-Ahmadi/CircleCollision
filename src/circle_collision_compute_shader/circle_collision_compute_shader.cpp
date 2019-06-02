@@ -20,9 +20,10 @@ constexpr int INIT_HEIGHT = 900;
 #define POSITIONS_BUFFER_BIND_ID			2 // PER INSTANCE
 #define SCALE_BUFFER_BIND_ID				3 // PER INSTANCE
 
-constexpr uint64_t	instance_count = (1 << 13);
+constexpr uint64_t	instance_count = (1 << 12);
 constexpr float		relative_velocity = 0.1f;
 constexpr float		relative_scale = 1.0f;
+constexpr size_t	local_workgroup_size = 128;
 
 constexpr bool mouse_bounding_enabled = false;
 constexpr bool mouse_drawing_enabled = true;
@@ -2054,7 +2055,7 @@ bool CircleCollisionComputeShader::create_compute_command_buffers()
 
 		// Dispatch the compute job
 		vkCmdPushConstants(this->compute.command_buffer, this->compute.pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(this->compute.push_constant), &this->compute.push_constant);
-		const auto workgroups = (instance_count > 64) ? instance_count / 64 : 1;
+		const auto workgroups = (instance_count > local_workgroup_size) ? instance_count / local_workgroup_size : 1;
 		vkCmdDispatch(compute.command_buffer, workgroups, 1, 1);
 
 		vkCmdPipelineBarrier(

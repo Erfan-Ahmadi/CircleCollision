@@ -1,6 +1,6 @@
 #version 450
 
-layout (local_size_x = 64) in;
+layout (local_size_x = 128) in;
 
 // Binding 0 : Position storage buffer
 layout(binding = 0) buffer Pos 

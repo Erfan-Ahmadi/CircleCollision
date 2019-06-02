@@ -1508,55 +1508,55 @@ void CircleCollisionSimple::update(const uint32_t& current_image)
 			this->circles.velocities[i].x *= -1;
 		}
 
-		/*
-				for (size_t j = 0; j < instance_count; ++j)
-				{
-					if (i == j)
-						continue;
 
-					const auto dx = this->circles.positions[i].x - this->circles.positions[j].x;
-					const auto dy = this->circles.positions[i].y - this->circles.positions[j].y;
-					const auto dis2 = (dy * dy + dx * dx);
-					const auto radii = this->circles.scales[i] + this->circles.scales[j];
+		for (size_t j = 0; j < instance_count; ++j)
+		{
+			if (i == j)
+				continue;
 
-					if (dis2 < radii * radii)
-					{
-						// Move Away
-						const auto dis = glm::sqrt(dis2);
-						const auto n = glm::vec2(dx / dis, dy / dis);
-						const auto covered = radii - dis;
-						const auto move_vec = n * (covered / 2.0f);
-						this->circles.positions[i] += move_vec;
-						this->circles.positions[j] -= move_vec;
+			const auto dx = this->circles.positions[i].x - this->circles.positions[j].x;
+			const auto dy = this->circles.positions[i].y - this->circles.positions[j].y;
+			const auto dis2 = (dy * dy + dx * dx);
+			const auto radii = this->circles.scales[i] + this->circles.scales[j];
 
-						// Change Velocity Direction
-						const auto m1 = this->circles.scales[i] * 5.0f;
-						const auto m2 = this->circles.scales[j] * 5.0f;
-						const auto p = 2 * (glm::dot(n, this->circles.velocities[i]) - glm::dot(n, this->circles.velocities[j])) / (m1 + m2);
-						this->circles.velocities[i] = (this->circles.velocities[i] - n * m2 * p);
-						this->circles.velocities[j] = (this->circles.velocities[j] + n * m1 * p);
-					}
-				}
+			if (dis2 < radii * radii)
+			{
+				// Move Away
+				const auto dis = glm::sqrt(dis2);
+				const auto n = glm::vec2(dx / dis, dy / dis);
+				const auto covered = radii - dis;
+				const auto move_vec = n * (covered / 2.0f);
+				this->circles.positions[i] += move_vec;
+				this->circles.positions[j] -= move_vec;
 
-				// Check Collision With Mouse
-				if (mouse_drawing_enabled && draw)
-				{
-					const float dx = this->circles.positions[i].x - mouse_pos.x;
-					const float dy = this->circles.positions[i].y - mouse_pos.y;
-					const auto dis2 = (dy * dy + dx * dx);
-					const auto radii = this->circles.scales[i] + mouse_draw_radius;
+				// Change Velocity Direction
+				const auto m1 = this->circles.scales[i] * 5.0f;
+				const auto m2 = this->circles.scales[j] * 5.0f;
+				const auto p = 2 * (glm::dot(n, this->circles.velocities[i]) - glm::dot(n, this->circles.velocities[j])) / (m1 + m2);
+				this->circles.velocities[i] = (this->circles.velocities[i] - n * m2 * p);
+				this->circles.velocities[j] = (this->circles.velocities[j] + n * m1 * p);
+			}
+		}
 
-					if (dis2 < radii * radii)
-					{
-						// Move Away
-						const auto dis = glm::sqrt(dis2);
-						const auto n = glm::vec2(dx / dis, dy / dis);
-						const auto covered = radii - dis;
-						const auto move_vec = n * (covered);
-						this->circles.positions[i] += move_vec;
-					}
-				}
-				*/
+		// Check Collision With Mouse
+		if (mouse_drawing_enabled && draw)
+		{
+			const float dx = this->circles.positions[i].x - mouse_pos.x;
+			const float dy = this->circles.positions[i].y - mouse_pos.y;
+			const auto dis2 = (dy * dy + dx * dx);
+			const auto radii = this->circles.scales[i] + mouse_draw_radius;
+
+			if (dis2 < radii * radii)
+			{
+				// Move Away
+				const auto dis = glm::sqrt(dis2);
+				const auto n = glm::vec2(dx / dis, dy / dis);
+				const auto covered = radii - dis;
+				const auto move_vec = n * (covered);
+				this->circles.positions[i] += move_vec;
+			}
+		}
+
 	}
 
 	if (draw)
@@ -1714,7 +1714,7 @@ bool CircleCollisionSimple::release()
 	if (DestroyDebugUtilsMessengerEXT != nullptr)
 	{
 		DestroyDebugUtilsMessengerEXT(this->instance, this->debug_messenger, nullptr);
-}
+	}
 #endif
 
 	if (this->device)

@@ -20,7 +20,6 @@ constexpr int INIT_HEIGHT = 900;
 #define POSITIONS_BUFFER_BIND_ID			2 // PER INSTANCE
 #define SCALE_BUFFER_BIND_ID				3 // PER INSTANCE
 
-constexpr uint64_t	instance_count = (1 << 12);
 constexpr float		relative_velocity = 0.1f;
 constexpr float		relative_scale = 1.0f;
 constexpr size_t	local_workgroup_size = 128;

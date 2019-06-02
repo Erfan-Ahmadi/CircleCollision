@@ -29,10 +29,10 @@
     <ClInclude Include="..\..\..\src\Renderer\vulkan_initializers.hpp">
       <Filter>Renderer</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\src\Renderer\common.hpp">
-      <Filter>Renderer</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\src\circle_collision_simple\circle_collision_simple.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Renderer\common.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

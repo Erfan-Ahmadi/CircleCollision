@@ -385,11 +385,11 @@ bool CircleCollisionComputeShader::setup_vulkan()
 		return false;
 	if (!create_descriptor_sets())
 		return false;
+	if (!prepare_compute())
+		return false;
 	if (!create_command_buffers())
 		return false;
 	if (!create_sync_objects())
-		return false;
-	if (!prepare_compute())
 		return false;
 
 	return true;
@@ -1167,8 +1167,6 @@ bool CircleCollisionComputeShader::create_instance_buffers()
 
 	if (!create_colors_buffer())
 		return false;
-	if (!create_positions_buffer())
-		return false;
 	if (!create_scales_buffer())
 		return false;
 
@@ -1352,7 +1350,7 @@ bool CircleCollisionComputeShader::create_command_buffers()
 
 			VkBuffer vertex_buffers[] = { this->vertex_buffer };
 			VkBuffer colors_buffers[] = { this->colors_buffer };
-			VkBuffer positions_buffers[] = { this->positions_buffer };
+			VkBuffer positions_buffers[] = { this->compute.storage_buffer };
 			VkBuffer scales_buffers[] = { this->scales_buffer };
 			VkDeviceSize offsets[] = { 0 };
 
@@ -1410,6 +1408,13 @@ bool CircleCollisionComputeShader::create_sync_objects()
 		}
 	}
 
+	// Compute Fence
+	fence_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+	fence_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+	if (vkCreateFence(this->device, &fence_info, nullptr, &this->compute.fence) != VK_SUCCESS)
+		return false;
+
 	return true;
 }
 
@@ -1427,20 +1432,24 @@ bool CircleCollisionComputeShader::cleanup_swap_chain()
 
 	vkDestroySwapchainKHR(this->device, this->swap_chain, nullptr);
 
-
+	// Graphics Fences
 	for (auto i = 0; i < this->num_frames; ++i)
 	{
 		vkDestroySemaphore(this->device, this->image_available_semaphore[i], nullptr);
 		vkDestroySemaphore(this->device, this->render_finished_semaphore[i], nullptr);
 		vkDestroyFence(this->device, this->draw_fences[i], nullptr);
 	}
+	// Compute Fence
+	vkDestroyFence(this->device, this->compute.fence, nullptr);
 
+	// SwapChain Images
 	for (size_t i = 0; i < this->swap_chain_images.size(); ++i)
 	{
 		vkDestroyBuffer(this->device, this->ubo_buffers[i], nullptr);
 		vkFreeMemory(this->device, this->ubo_buffers_memory[i], nullptr);
 	}
 
+	// DescriptorPool
 	vkDestroyDescriptorPool(this->device, this->descriptor_pool, nullptr);
 
 	return true;
@@ -1542,7 +1551,8 @@ bool CircleCollisionComputeShader::draw_frame()
 	submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 	submit_info.commandBufferCount = 1;
 	submit_info.pCommandBuffers = &this->compute.command_buffer;
-	//vkQueueSubmit(compute.queue, 1, &submit_info, this->compute.fence);
+	vkResetFences(device, 1, &compute.fence);
+	vkQueueSubmit(compute.queue, 1, &submit_info, this->compute.fence);
 
 	vkWaitForFences(this->device, 1, &this->draw_fences[this->current_frame], VK_TRUE, std::numeric_limits<uint64_t>::max());
 
@@ -1626,8 +1636,7 @@ bool CircleCollisionComputeShader::draw_frame()
 	this->current_frame = (this->current_frame + 1) % this->num_frames;
 
 	// Submit compute commands
-	//vkWaitForFences(device, 1, &compute.fence, VK_TRUE, UINT64_MAX);
-	//vkResetFences(device, 1, &compute.fence);
+	vkWaitForFences(device, 1, &compute.fence, VK_TRUE, UINT64_MAX);
 
 	return true;
 }
@@ -1754,14 +1763,6 @@ bool CircleCollisionComputeShader::prepare_compute()
 		return false;
 	}
 
-	// Fence
-	VkFenceCreateInfo fence_info = {};
-	fence_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-	fence_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-
-	if (vkCreateFence(this->device, &fence_info, nullptr, &this->compute.fence) != VK_SUCCESS)
-		return false;
-
 	// Command Buffers
 	if (!create_compute_command_buffers())
 		return false;
@@ -1813,6 +1814,8 @@ bool CircleCollisionComputeShader::prepare_compute_buffers()
 
 	vkDestroyBuffer(this->device, staging_buffer, nullptr);
 	vkFreeMemory(this->device, staging_buffer_memory, nullptr);
+
+	// --------------------------------
 
 	// Create Compute UBO Buffer 
 	if (!helper::create_buffer(
@@ -1955,9 +1958,6 @@ bool CircleCollisionComputeShader::release()
 		vkDestroyBuffer(this->device, this->colors_buffer, nullptr);
 		vkFreeMemory(this->device, this->colors_buffer_memory, nullptr);
 
-		vkDestroyBuffer(this->device, this->positions_buffer, nullptr);
-		vkFreeMemory(this->device, this->positions_buffer_memory, nullptr);
-
 		vkDestroyBuffer(this->device, this->scales_buffer, nullptr);
 		vkFreeMemory(this->device, this->scales_buffer_memory, nullptr);
 
@@ -2018,30 +2018,6 @@ bool CircleCollisionComputeShader::create_colors_buffer()
 	return true;
 }
 
-bool CircleCollisionComputeShader::create_positions_buffer()
-{
-	const VkDeviceSize buffer_size = sizeof(glm::vec2) * instance_count;
-
-	if (!helper::create_buffer(
-		this->device,
-		this->physical_device,
-		buffer_size,
-		VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-		VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT,
-		this->positions_buffer,
-		this->positions_buffer_memory))
-	{
-		return false;
-	}
-
-	void* data = nullptr;
-	vkMapMemory(this->device, this->positions_buffer_memory, 0, buffer_size, 0, &data);
-	memcpy(data, this->circles.positions.data(), buffer_size);
-	vkUnmapMemory(this->device, this->positions_buffer_memory);
-
-	return true;
-}
-
 bool CircleCollisionComputeShader::create_scales_buffer()
 {
 	const VkDeviceSize buffer_size = sizeof(float) * instance_count;
@@ -2097,9 +2073,12 @@ void CircleCollisionComputeShader::setup_circles()
 	{
 		this->circles.scales[i] = min_size + (rand() % (max_size - min_size));
 		this->circles.velocities[i] = relative_velocity * glm::vec2(((rand() % 100) / 200.0f) * ((rand() % 2) * 2 - 1.0f), (rand() % 100) / 200.0f * ((rand() % 2) * 2 - 1.0f)) / glm::sqrt(this->circles.scales[i]) * 3.0f;
-		this->circles.positions[i] = glm::vec2(
-			this->circles.scales[i] + rand() % (INIT_WIDTH - 2 * static_cast<int>(this->circles.scales[i])),
-			this->circles.scales[i] + rand() % (INIT_HEIGHT - 2 * static_cast<int>(this->circles.scales[i])));
+		//this->circles.positions[i] = glm::vec2(
+		//	this->circles.scales[i] + rand() % (INIT_WIDTH - 2 * static_cast<int>(this->circles.scales[i])),
+		//	this->circles.scales[i] + rand() % (INIT_HEIGHT - 2 * static_cast<int>(this->circles.scales[i])));
+
+		this->circles.positions[i] = glm::vec2(0, 0);
+
 		this->circles.colors[i] = glm::vec3((rand() % 255) / 255.0f, (rand() % 255) / 255.0f, (rand() % 255) / 255.0f);
 	}
 }

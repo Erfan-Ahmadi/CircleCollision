@@ -138,7 +138,7 @@ private:
 	bool create_sync_objects();
 
 	bool create_colors_buffer(); //
-	bool create_positions_buffer(); //
+	// bool create_positions_buffer(); // in prepare_compute_buffers()
 	bool create_scales_buffer(); // 
 
 	bool cleanup_swap_chain();
@@ -202,9 +202,6 @@ private:
 	VkBuffer scales_buffer;
 	VkDeviceMemory scales_buffer_memory;
 
-	VkBuffer positions_buffer;
-	VkDeviceMemory positions_buffer_memory;
-
 	std::vector<VkBuffer> ubo_buffers;
 	std::vector<VkDeviceMemory> ubo_buffers_memory;
 
@@ -233,7 +230,7 @@ private:
 	VkQueue graphics_queue;
 	VkQueue present_queue;
 
-	bool should_recreate_swapchain;
+	bool should_recreate_swapchain = false;
 
 	VkSwapchainKHR swap_chain;
 	std::vector<VkImage> swap_chain_images;

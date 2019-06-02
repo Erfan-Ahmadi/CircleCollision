@@ -204,6 +204,12 @@ private:
 			alignas(alignof(float))		float dt;
 			alignas(alignof(int))		int count;
 		} ubo;
+
+		struct 
+		{
+			int right;
+			int bottom;
+		} push_constant;
 	} compute;
 
 	// Sample ----------------

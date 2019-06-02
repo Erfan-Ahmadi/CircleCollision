@@ -12,15 +12,15 @@
 #define GetCurrentDir _getcwd
 #endif
 
-constexpr int INIT_WIDTH = 1280;
-constexpr int INIT_HEIGHT = 720;
+constexpr int INIT_WIDTH = 1600;
+constexpr int INIT_HEIGHT = 900;
 
 #define VERTEX_BUFFER_BIND_ID				0 // PER VERTEX
 #define COLOR_BUFFER_BIND_ID				1 // PER INSTANCE
 #define POSITIONS_BUFFER_BIND_ID			2 // PER INSTANCE
 #define SCALE_BUFFER_BIND_ID				3 // PER INSTANCE
 
-constexpr uint64_t	instance_count = (1 << 10);
+constexpr uint64_t	instance_count = (1 << 13);
 constexpr float		relative_velocity = 0.1f;
 constexpr float		relative_scale = 1.0f;
 
@@ -1712,10 +1712,18 @@ bool CircleCollisionComputeShader::prepare_compute()
 	}
 
 	// Pipeline Layout
+
+	VkPushConstantRange pcr = {};
+	pcr.offset = 0;
+	pcr.size = sizeof(this->compute.push_constant);
+	pcr.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
 	VkPipelineLayoutCreateInfo pipeline_layout_info = {};
 	pipeline_layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	pipeline_layout_info.setLayoutCount = 1;
 	pipeline_layout_info.pSetLayouts = &this->compute.descriptor_set_layout;
+	pipeline_layout_info.pushConstantRangeCount = 1;
+	pipeline_layout_info.pPushConstantRanges = &pcr;
 
 	if (vkCreatePipelineLayout(this->device, &pipeline_layout_info, nullptr, &this->compute.pipeline_layout) != VK_SUCCESS)
 	{
@@ -1803,6 +1811,10 @@ bool CircleCollisionComputeShader::prepare_compute_buffers()
 		return false;
 	if (!create_compute_ubo_buffer())
 		return false;
+
+	this->compute.push_constant.right = INIT_WIDTH;
+	this->compute.push_constant.bottom = INIT_HEIGHT;
+
 	return true;
 }
 
@@ -2041,7 +2053,9 @@ bool CircleCollisionComputeShader::create_compute_command_buffers()
 		vkCmdBindDescriptorSets(this->compute.command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, compute.pipeline_layout, 0, 1, &this->compute.descriptor_set, 0, 0);
 
 		// Dispatch the compute job
-		vkCmdDispatch(compute.command_buffer, instance_count / 64, 1, 1);
+		vkCmdPushConstants(this->compute.command_buffer, this->compute.pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(this->compute.push_constant), &this->compute.push_constant);
+		const auto workgroups = (instance_count > 64) ? instance_count / 64 : 1;
+		vkCmdDispatch(compute.command_buffer, workgroups, 1, 1);
 
 		vkCmdPipelineBarrier(
 			this->compute.command_buffer,
@@ -2072,7 +2086,7 @@ bool CircleCollisionComputeShader::release()
 	if (DestroyDebugUtilsMessengerEXT != nullptr)
 	{
 		DestroyDebugUtilsMessengerEXT(this->instance, this->debug_messenger, nullptr);
-	}
+}
 #endif
 
 	if (this->device)

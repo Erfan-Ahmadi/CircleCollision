@@ -1,4 +1,6 @@
- <img src="https://raw.githubusercontent.com/Erfan-Ahmadi/circle_collision/master/docs/LOGO.png" align="center" alt="" width="450" height="43" />
+<p align="center">
+<img src="https://raw.githubusercontent.com/Erfan-Ahmadi/circle_collision/master/docs/LOGO.png" align="center" alt="" width="450" height="43" />
+</p>
 
 # Circle Collision
 Implementing Different Methods of Circle to Circle Collision Detection using Vulkan Graphics and Compute API  
@@ -6,8 +8,6 @@ Implementing Different Methods of Circle to Circle Collision Detection using Vul
 I'll be refering to the simplest collision detection algorithm which has two nested "for"'s **Double For Algorithm**  
 
 # Motivation
-
- <img src="https://raw.githubusercontent.com/Erfan-Ahmadi/circle_collision/master/docs/draw-fun.gif" alt="" width="640" height="360" />
 
 This Project Is For Learning Purposes of Following Topics
 - Collision Detection Algorithms

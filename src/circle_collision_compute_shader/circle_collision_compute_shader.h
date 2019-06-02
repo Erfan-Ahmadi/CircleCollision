@@ -201,14 +201,16 @@ private:
 
 		struct
 		{
-			alignas(alignof(float))		float dt;
-			alignas(alignof(int))		int count;
+			alignas(4)		float dt;
+			alignas(4)		int count;
+			alignas(8)		glm::vec2 mouse_pos;
 		} ubo;
 
 		struct 
 		{
-			int right;
-			int bottom;
+			alignas(4) int right;
+			alignas(4) int bottom;
+			alignas(1) bool draw;
 		} push_constant;
 	} compute;
 

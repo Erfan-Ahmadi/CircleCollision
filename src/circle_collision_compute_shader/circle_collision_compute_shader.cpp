@@ -1519,9 +1519,9 @@ void CircleCollisionComputeShader::update(const uint32_t& current_image)
 
 	int mouse_state = glfwGetMouseButton(this->window, GLFW_MOUSE_BUTTON_LEFT);
 
-	glm::vec2 mouse_pos;
+	glm::vec2 mouse_pos{};
 
-	if (mouse_state == GLFW_PRESS)
+	//if (mouse_state == GLFW_PRESS)
 	{
 		draw = true;
 		double xpos, ypos;
@@ -1532,6 +1532,7 @@ void CircleCollisionComputeShader::update(const uint32_t& current_image)
 	// Compute UBO Update
 	this->compute.ubo.count = instance_count;
 	this->compute.ubo.dt = this->frame_timer;
+	this->compute.ubo.mouse_pos = mouse_pos;
 
 	vkMapMemory(this->device, this->compute.ubo_buffer.device_memory, 0, sizeof(this->compute.ubo), 0, &data);
 	memcpy(data, &this->compute.ubo, sizeof(this->compute.ubo));
@@ -1811,6 +1812,7 @@ bool CircleCollisionComputeShader::prepare_compute_buffers()
 
 	this->compute.push_constant.right = INIT_WIDTH;
 	this->compute.push_constant.bottom = INIT_HEIGHT;
+	this->compute.push_constant.draw = false;
 
 	return true;
 }
@@ -2049,8 +2051,9 @@ bool CircleCollisionComputeShader::create_compute_command_buffers()
 		vkCmdBindPipeline(this->compute.command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, this->compute.pipeline);
 		vkCmdBindDescriptorSets(this->compute.command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, compute.pipeline_layout, 0, 1, &this->compute.descriptor_set, 0, 0);
 
-		// Dispatch the compute job
 		vkCmdPushConstants(this->compute.command_buffer, this->compute.pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(this->compute.push_constant), &this->compute.push_constant);
+
+		// Dispatch the compute job
 		const auto workgroups = (instance_count > local_workgroup_size) ? instance_count / local_workgroup_size : 1;
 		vkCmdDispatch(compute.command_buffer, workgroups, 1, 1);
 
@@ -2083,7 +2086,7 @@ bool CircleCollisionComputeShader::release()
 	if (DestroyDebugUtilsMessengerEXT != nullptr)
 	{
 		DestroyDebugUtilsMessengerEXT(this->instance, this->debug_messenger, nullptr);
-}
+	}
 #endif
 
 	if (this->device)

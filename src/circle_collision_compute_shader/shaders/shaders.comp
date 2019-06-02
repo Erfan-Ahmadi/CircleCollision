@@ -22,14 +22,16 @@ layout(binding = 2) buffer Vel
 
 layout(push_constant) uniform Bounding
 {
-	int right_wall;
-	int bottom_wall;
-} bounding;
+	int		right_wall;
+	int		bottom_wall;
+	bool	draw;
+} constants;
 
 layout (binding = 3) uniform UBO 
 {
 	float dt;
 	int count;
+	vec2 mouse_pos;
 } ubo;
 
 void main() 
@@ -45,9 +47,9 @@ void main()
 		positions[i].y = scales[i];
 		velocities[i].y *= -1;
 	}
-	else if (positions[i].y + scales[i] >= bounding.bottom_wall)
+	else if (positions[i].y + scales[i] >= constants.bottom_wall)
 	{
-		positions[i].y = bounding.bottom_wall - scales[i];
+		positions[i].y = constants.bottom_wall - scales[i];
 		velocities[i].y *= -1;
 	}
 
@@ -56,9 +58,9 @@ void main()
 		positions[i].x = scales[i];
 		velocities[i].x *= -1;
 	}
-	else if (positions[i].x + scales[i] >= bounding.right_wall)
+	else if (positions[i].x + scales[i] >= constants.right_wall)
 	{
-		positions[i].x = bounding.right_wall - scales[i];
+		positions[i].x = constants.right_wall - scales[i];
 		velocities[i].x *= -1;
 	}
 					
@@ -88,6 +90,23 @@ void main()
 			const float p = 2 * (dot(n, velocities[i]) - dot(n, velocities[j])) / (m1 + m2);
 			velocities[i] = (velocities[i] - n * m2 * p);
 			velocities[j] = (velocities[j] + n * m1 * p);
+		}
+				
+		if (constants.draw)
+		{
+			const float dx = positions[i].x - ubo.mouse_pos.x;
+			const float dy = positions[i].y - ubo.mouse_pos.y;
+			const float dis2 = (dy * dy + dx * dx);
+			const float radii = scales[i] + 40.0f;
+			
+			if (dis2 < radii * radii)
+			{
+				const float dis = sqrt(dis2);
+				const vec2 n = vec2(dx / dis, dy / dis);
+				const float covered = radii - dis;
+				const vec2 move_vec = n * (covered);
+				positions[i] += move_vec;
+			}
 		}
 	}
 }

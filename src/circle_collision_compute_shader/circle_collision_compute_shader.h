@@ -179,7 +179,8 @@ private:
 
 		struct
 		{
-			alignas(alignof(float)) float dt;
+			alignas(alignof(float))		float dt;
+			alignas(alignof(int))		int count;
 		} ubo;
 	} compute;
 

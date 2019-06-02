@@ -1534,6 +1534,15 @@ void CircleCollisionComputeShader::update(const uint32_t& current_image)
 		mouse_pos = glm::vec2(xpos, INIT_HEIGHT - ypos);
 	}
 
+	// Compute UBO Update
+	this->compute.ubo.count = instance_count;
+	this->compute.ubo.dt = this->frame_timer;
+	
+	vkMapMemory(this->device, this->compute.ubo_buffer_memory, 0, sizeof(this->compute.ubo), 0, &data);
+	memcpy(data, &this->compute.ubo, sizeof(this->compute.ubo));
+	vkUnmapMemory(this->device, this->compute.ubo_buffer_memory);
+
+	// Graphics UBO Update
 	UniformBufferObject ubo = {};
 
 	ubo.view = glm::lookAt(glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
@@ -1825,7 +1834,7 @@ bool CircleCollisionComputeShader::prepare_compute_buffers()
 		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 		this->compute.ubo_buffer,
-		this->compute.storage_buffer_memory))
+		this->compute.ubo_buffer_memory))
 	{
 		return false;
 	}

@@ -10,11 +10,16 @@ layout(std140, binding = 0) buffer Pos
 
 layout (binding = 1) uniform UBO 
 {
-	float deltaT;
+	float dt;
+	int count;
 } ubo;
 
 void main() 
 {
-	positions[0] = vec2(100, 100);
+	uint index = gl_GlobalInvocationID.x;
+    if (index >= ubo.count) 
+		return;
+
+	positions[index] += vec2(index, 100) * ubo.dt / 1000.0f;
 }
 

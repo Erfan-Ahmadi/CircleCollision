@@ -210,7 +210,7 @@ private:
 		{
 			alignas(4) int right;
 			alignas(4) int bottom;
-			alignas(1) bool draw;
+			alignas(4) bool draw;
 		} push_constant;
 	} compute;
 

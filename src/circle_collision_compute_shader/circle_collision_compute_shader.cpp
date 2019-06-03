@@ -1521,7 +1521,7 @@ void CircleCollisionComputeShader::update(const uint32_t& current_image)
 
 	glm::vec2 mouse_pos{};
 
-	//if (mouse_state == GLFW_PRESS)
+	if (mouse_state == GLFW_PRESS)
 	{
 		draw = true;
 		double xpos, ypos;
@@ -1683,6 +1683,9 @@ bool CircleCollisionComputeShader::main_loop()
 	return true;
 }
 
+
+// Compute 
+
 bool CircleCollisionComputeShader::prepare_compute()
 {
 	vkGetDeviceQueue(device, family_indices.compute_family.value(), 0, &this->compute.queue);
@@ -1810,9 +1813,10 @@ bool CircleCollisionComputeShader::prepare_compute_buffers()
 	if (!create_compute_ubo_buffer())
 		return false;
 
+	this->compute.push_constant = {};
 	this->compute.push_constant.right = INIT_WIDTH;
 	this->compute.push_constant.bottom = INIT_HEIGHT;
-	this->compute.push_constant.draw = false;
+	this->compute.push_constant.draw = true;
 
 	return true;
 }

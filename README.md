@@ -5,6 +5,12 @@
 # Circle Collision
 Implementing Different Methods of Circle to Circle Collision Detection using Vulkan Graphics and Compute API  
 
+**Circles** were chosen to focus more on [**Broad-Phase**](https://developer.nvidia.com/gpugems/GPUGems3/gpugems3_ch32.html) algorithms of the Collision Detection Pipeline.
+
+<p align="center">
+ <img src="https://raw.githubusercontent.com/Erfan-Ahmadi/circle_collision/master/docs/Collision-detection-pipeline.png" width="372" height="85"/>
+ </p>
+
 # Images and Preview
 
 <p align="center">
@@ -22,32 +28,35 @@ This Project Is For Learning Purposes of Following Topics
 - Vulkan Compute Shaders and GPGPU Programming
 - Data Oriented Programming
 
-Implementing these Collision Detection Methods:
-- Brute Force (simplest)
-- Sort and Sweep Algorithm
-- Spatial Parttioning
-  - Grid
-  - Quadtree/Octree
-  - BSP
-  - k-d Trees
-  - Bounding Volume
+# Features
+
+- **Broad-Phase**
+  - Brute Force ( O(n^2) )
+  - Spatial Partitioning
+    - Grid
+    - K-D Tree
+    - Quadtrees
+    - BSP
+  - Sort and sweep
+  - Simplex-Based : GJK
+  
+- **Narrow-Phase**
+   - We Have Circles Here and Math/Physics Calculations are easy.
+   
+- **Technologies/API's**
+  - Simple CPU 
+  - Vulkan Compute Shaders
+  - CPU Multi-Threading
+  - OpenCL GPU
+  - SIMD AVX2
 
 <img src="https://raw.githubusercontent.com/Erfan-Ahmadi/circle_collision/master/docs/spatial%20partitioning.PNG" alt="" />
 
-**This NOT a benchmark, Although It would give me some ideas and thing to be suspicious about.
-And also I would appreciate optimization ideas and results on your system.**
-
-# Features
+# Implemented
 
 - Brute Force
   - [x] CPU
   - [x] Compute Shader
-  - [ ] SIMD
-  
-- Spatial Partitioning
-  - [ ] CPU
-  - [ ] Compute Shader
-  - [ ] SIMD
   
 
 # Build

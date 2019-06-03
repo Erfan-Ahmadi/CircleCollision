@@ -1518,7 +1518,7 @@ void CircleCollisionComputeShader::update(const uint32_t& current_image)
 		mouse_pos = glm::vec2(xpos, INIT_HEIGHT - ypos);
 	}
 
-	//this->compute.push_constant.draw = (mouse_state == GLFW_PRESS);
+	this->compute.push_constant.draw = (mouse_state == GLFW_PRESS);
 
 	// Compute UBO Update
 	this->compute.ubo.count = instance_count;
@@ -1807,7 +1807,7 @@ bool CircleCollisionComputeShader::prepare_compute_buffers()
 	this->compute.push_constant = {};
 	this->compute.push_constant.right = INIT_WIDTH;
 	this->compute.push_constant.bottom = INIT_HEIGHT;
-	this->compute.push_constant.draw = true;
+	this->compute.push_constant.draw = false;
 
 	return true;
 }

@@ -36,7 +36,7 @@ Implementing these Collision Detection Methods:
 
 <img src="https://raw.githubusercontent.com/Erfan-Ahmadi/circle_collision/master/docs/spatial%20partitioning.PNG" alt="" />
 
-**This NOT a benchmark, Although It would give me some ideas and thing to be suspicius about.
+**This NOT a benchmark, Although It would give me some ideas and thing to be suspicious about.
 And also I would appreciate optimization ideas and results on your system.**
 
 # Features

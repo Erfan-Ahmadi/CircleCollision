@@ -270,17 +270,6 @@ static void resize_callback(GLFWwindow* window, int width, int height)
 	app->window_resize();
 }
 
-static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
-	VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-	VkDebugUtilsMessageTypeFlagsEXT maessageType,
-	const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
-	void* pUserData) {
-
-	std::cerr << "validation layer: " << pCallbackData->pMessage << std::endl << std::endl;
-
-	return VK_FALSE;
-}
-
 static std::vector<char> read_file(const std::string& fileName)
 {
 	std::ifstream file(fileName, std::ios::ate | std::ios::binary);
@@ -1529,6 +1518,8 @@ void CircleCollisionComputeShader::update(const uint32_t& current_image)
 		mouse_pos = glm::vec2(xpos, INIT_HEIGHT - ypos);
 	}
 
+	//this->compute.push_constant.draw = (mouse_state == GLFW_PRESS);
+
 	// Compute UBO Update
 	this->compute.ubo.count = instance_count;
 	this->compute.ubo.dt = this->frame_timer;
@@ -1677,15 +1668,15 @@ bool CircleCollisionComputeShader::main_loop()
 			this->last_timestamp = t_end;
 		}
 
+		recreate_compute_command_buffers();
+
 		glfwPollEvents();
 	}
 
 	return true;
 }
 
-
 // Compute 
-
 bool CircleCollisionComputeShader::prepare_compute()
 {
 	vkGetDeviceQueue(device, family_indices.compute_family.value(), 0, &this->compute.queue);
@@ -2014,62 +2005,88 @@ bool CircleCollisionComputeShader::create_compute_command_buffers()
 	if (vkAllocateCommandBuffers(this->device, &alloc_info, &this->compute.command_buffer) != VK_SUCCESS)
 		return false;
 
-	// Record Command Buffer
+	if (!record_compute_command_buffers())
+		return false;
 
-	// WAIT FOR VERTEX SHADER READ
+	return true;
+}
+
+bool CircleCollisionComputeShader::check_compute_command_buffers()
+{
+	if (this->compute.command_buffer == VK_NULL_HANDLE)
+		return false;
+	return true;
+}
+
+void CircleCollisionComputeShader::destroy_compute_command_buffers()
+{
+	vkFreeCommandBuffers(device, this->compute.command_pool, 1, &this->compute.command_buffer);
+}
+
+void CircleCollisionComputeShader::recreate_compute_command_buffers()
+{
+	if (!check_compute_command_buffers())
+	{
+		destroy_compute_command_buffers();
+		create_compute_command_buffers();
+	}
+
+	record_compute_command_buffers();
+}
+
+bool CircleCollisionComputeShader::record_compute_command_buffers()
+{
 	VkCommandBufferBeginInfo begin_info{};
 	begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
 	if (vkBeginCommandBuffer(this->compute.command_buffer, &begin_info) != VK_SUCCESS)
 		return false;
 
-	{
-		VkBufferMemoryBarrier barrier = {};
-		barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
-		barrier.buffer = this->compute.position_buffer.buffer;
-		barrier.offset = this->compute.position_buffer.offset;
-		barrier.size = this->compute.position_buffer.size;
-		barrier.srcAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
-		barrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT; // ??
-		barrier.srcQueueFamilyIndex = this->family_indices.graphics_family.value();
-		barrier.dstQueueFamilyIndex = this->family_indices.compute_family.value();
+	VkBufferMemoryBarrier barrier = {};
+	barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+	barrier.buffer = this->compute.position_buffer.buffer;
+	barrier.offset = this->compute.position_buffer.offset;
+	barrier.size = this->compute.position_buffer.size;
+	barrier.srcAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
+	barrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT; // ??
+	barrier.srcQueueFamilyIndex = this->family_indices.graphics_family.value();
+	barrier.dstQueueFamilyIndex = this->family_indices.compute_family.value();
 
-		vkCmdPipelineBarrier(
-			this->compute.command_buffer,
-			VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
-			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-			0, // No Flags
-			0, nullptr,
-			1, &barrier,
-			0, nullptr);
+	vkCmdPipelineBarrier(
+		this->compute.command_buffer,
+		VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
+		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+		0, // No Flags
+		0, nullptr,
+		1, &barrier,
+		0, nullptr);
 
-		// WAIT FOR COMPUTE SHADER WRITE
-		barrier.buffer = this->compute.position_buffer.buffer;
-		barrier.offset = this->compute.position_buffer.offset;
-		barrier.size = this->compute.position_buffer.size;
-		barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-		barrier.dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
-		barrier.srcQueueFamilyIndex = this->family_indices.compute_family.value();
-		barrier.dstQueueFamilyIndex = this->family_indices.graphics_family.value();
+	// WAIT FOR COMPUTE SHADER WRITE
+	barrier.buffer = this->compute.position_buffer.buffer;
+	barrier.offset = this->compute.position_buffer.offset;
+	barrier.size = this->compute.position_buffer.size;
+	barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+	barrier.dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
+	barrier.srcQueueFamilyIndex = this->family_indices.compute_family.value();
+	barrier.dstQueueFamilyIndex = this->family_indices.graphics_family.value();
 
-		vkCmdBindPipeline(this->compute.command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, this->compute.pipeline);
-		vkCmdBindDescriptorSets(this->compute.command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, compute.pipeline_layout, 0, 1, &this->compute.descriptor_set, 0, 0);
+	vkCmdBindPipeline(this->compute.command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, this->compute.pipeline);
+	vkCmdBindDescriptorSets(this->compute.command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, compute.pipeline_layout, 0, 1, &this->compute.descriptor_set, 0, 0);
 
-		vkCmdPushConstants(this->compute.command_buffer, this->compute.pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(this->compute.push_constant), &this->compute.push_constant);
+	vkCmdPushConstants(this->compute.command_buffer, this->compute.pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(this->compute.push_constant), &this->compute.push_constant);
 
-		// Dispatch the compute job
-		const auto workgroups = (instance_count > local_workgroup_size) ? instance_count / local_workgroup_size : 1;
-		vkCmdDispatch(compute.command_buffer, workgroups, 1, 1);
+	// Dispatch the compute job
+	const auto workgroups = (instance_count > local_workgroup_size) ? instance_count / local_workgroup_size : 1;
+	vkCmdDispatch(compute.command_buffer, workgroups, 1, 1);
 
-		vkCmdPipelineBarrier(
-			this->compute.command_buffer,
-			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-			VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
-			0, // No Flags
-			0, nullptr,
-			1, &barrier,
-			0, nullptr);
-	}
+	vkCmdPipelineBarrier(
+		this->compute.command_buffer,
+		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+		VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
+		0, // No Flags
+		0, nullptr,
+		1, &barrier,
+		0, nullptr);
 
 	if (vkEndCommandBuffer(this->compute.command_buffer) != VK_SUCCESS)
 		return false;
@@ -2102,6 +2119,7 @@ bool CircleCollisionComputeShader::release()
 		vkDestroyPipeline(this->device, this->compute.pipeline, nullptr);
 		vkDestroyPipelineLayout(this->device, this->compute.pipeline_layout, nullptr);
 		//vkDestroyFence(this->device, this->compute.fence, nullptr);
+		destroy_compute_command_buffers();
 		vkDestroyCommandPool(this->device, this->compute.command_pool, nullptr);
 		vkDestroyDescriptorSetLayout(this->device, this->compute.descriptor_set_layout, nullptr);
 

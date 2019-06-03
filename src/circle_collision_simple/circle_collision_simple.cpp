@@ -233,17 +233,6 @@ static void resize_callback(GLFWwindow* window, int width, int height)
 	app->window_resize();
 }
 
-static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
-	VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-	VkDebugUtilsMessageTypeFlagsEXT maessageType,
-	const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
-	void* pUserData) {
-
-	std::cerr << "validation layer: " << pCallbackData->pMessage << std::endl;
-
-	return VK_FALSE;
-}
-
 static std::vector<char> read_file(const std::string& fileName)
 {
 	std::ifstream file(fileName, std::ios::ate | std::ios::binary);

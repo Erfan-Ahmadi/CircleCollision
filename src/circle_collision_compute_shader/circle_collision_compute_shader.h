@@ -180,6 +180,10 @@ private:
 	bool create_compute_velocities_buffer();
 	bool create_compute_ubo_buffer();
 	bool create_compute_command_buffers();
+	bool check_compute_command_buffers();
+	void destroy_compute_command_buffers();
+	void recreate_compute_command_buffers();
+	bool record_compute_command_buffers();
 
 	// TODO: Consider more than 1 swapchain image
 	struct

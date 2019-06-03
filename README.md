@@ -5,8 +5,6 @@
 # Circle Collision
 Implementing Different Methods of Circle to Circle Collision Detection using Vulkan Graphics and Compute API  
 
-I'll be refering to the simplest collision detection algorithm which has two nested "for"'s **Double For Algorithm**  
-
 # Images and Preview
 
 <p align="center">
@@ -25,7 +23,7 @@ This Project Is For Learning Purposes of Following Topics
 - Data Oriented Programming
 
 Implementing these Collision Detection Methods:
-- Double For (simplest)
+- Brute Force (simplest)
 - Sort and Sweep Algorithm
 - Spatial Parttioning
   - Grid
@@ -41,7 +39,7 @@ And also I would appreciate optimization ideas and results on your system.**
 
 # Features
 
-- Double For
+- Brute Force
   - [x] CPU
   - [x] Compute Shader
   - [ ] SIMD

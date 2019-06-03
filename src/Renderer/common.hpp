@@ -8,5 +8,5 @@
 constexpr int INIT_WIDTH = 1280;
 constexpr int INIT_HEIGHT = 720;
 
-constexpr uint64_t	instance_count = (1 << 11);
+constexpr uint64_t	instance_count = (1 << 13);
 #define Log(str) std::cout << str << std::endl

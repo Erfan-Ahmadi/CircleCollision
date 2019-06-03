@@ -94,22 +94,22 @@ void main()
 			velocities[i] = (velocities[i] - n * m2 * p);
 			velocities[j] = (velocities[j] + n * m1 * p);
 		}
+	}
 				
-		if (constants.draw)
+	if (constants.draw)
+	{
+		const float dx = positions[i].x - ubo.mouse_pos.x;
+		const float dy = positions[i].y - ubo.mouse_pos.y;
+		const float dis2 = (dy * dy + dx * dx);
+		const float radii = scales[i] + 40.0f;
+		
+		if (dis2 < radii * radii)
 		{
-			const float dx = positions[i].x - ubo.mouse_pos.x;
-			const float dy = positions[i].y - ubo.mouse_pos.y;
-			const float dis2 = (dy * dy + dx * dx);
-			const float radii = scales[i] + 40.0f;
-			
-			if (dis2 < radii * radii)
-			{
-				const float dis = sqrt(dis2);
-				const vec2 n = vec2(dx / dis, dy / dis);
-				const float covered = radii - dis;
-				const vec2 move_vec = n * (covered);
-				positions[i] += move_vec;
-			}
+			const float dis = sqrt(dis2);
+			const vec2 n = vec2(dx / dis, dy / dis);
+			const float covered = radii - dis;
+			const vec2 move_vec = n * (covered);
+			positions[i] += move_vec;
 		}
 	}
 }

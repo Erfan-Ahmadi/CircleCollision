@@ -1477,7 +1477,7 @@ void CircleCollisionSimple::update(const uint32_t& current_image)
 	{
 		if (draw && glm::distance(this->circles.positions[i], mouse_pos) < mouse_draw_radius)
 		{
-			this->circles.velocities[i] = (mouse_pos - this->circles.positions[i]) * 10e-4f;
+			this->circles.velocities[i] = -1.0f * (mouse_pos - this->circles.positions[i]) * 10e-3f;
 		}
 
 		this->circles.positions[i] += this->circles.velocities[i] * this->frame_timer;

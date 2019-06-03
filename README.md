@@ -17,13 +17,13 @@ I'll be refering to the simplest collision detection algorithm which has two nes
 # Motivation
 
 This Project Is For Learning Purposes of Following Topics
-- Collision Detection Algorithms
 - SIMD/Vectorization using **AVX**/**AVX2**
-- Vulkan Compute Shaders
+- Vulkan Compute Shaders and GPGPU Programming
 - Data Oriented Programming
 
-With Collision Detection MEthods:
+Implementing these Collision Detection Methods:
 - Double For (simplest)
+- Sort and Sweep Algorithm
 - Spatial Parttioning
   - Grid
   - Quadtree/Octree
@@ -41,7 +41,7 @@ And also I would appreciate optimization ideas and results on your system.**
   - [x] Compute Shader
   - [ ] SIMD
   
- - Spatial Partitioning
+- Spatial Partitioning
   - [ ] CPU
   - [ ] Compute Shader
   - [ ] SIMD

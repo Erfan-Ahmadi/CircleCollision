@@ -10,10 +10,13 @@ I'll be refering to the simplest collision detection algorithm which has two nes
 # Images and Preview
 
 <p align="center">
+ 
  <img src="https://raw.githubusercontent.com/Erfan-Ahmadi/circle_collision/master/docs/heart_collision.jpg" alt="" width="320" height="180" />
  <img src="https://raw.githubusercontent.com/Erfan-Ahmadi/circle_collision/master/docs/draw-fun.gif" alt="" width="320" height="180" />
-</p>
+ <img src="https://raw.githubusercontent.com/Erfan-Ahmadi/circle_collision/master/docs/explode_fun.gif" alt="" width="320" height="180" />
 
+</p>
+ 
 # Motivation
 
 This Project Is For Learning Purposes of Following Topics

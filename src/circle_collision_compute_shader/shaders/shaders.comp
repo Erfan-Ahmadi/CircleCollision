@@ -63,9 +63,6 @@ void main()
 		positions[i].x = constants.right_wall - scales[i];
 		velocities[i].x *= -1;
 	}
-						
-	memoryBarrierShared();
-	barrier();	
 
 	for (uint j = 0; j < ubo.count; ++j)
 	{

@@ -1,7 +1,5 @@
 #pragma once
 
-#include "common.hpp"
-
 // Selected Functions from SaschaWilliens' Example vkinitializers.hpp
 
 namespace initializers

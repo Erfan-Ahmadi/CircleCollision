@@ -1,84 +1,7 @@
 #pragma once
 
-#include "Renderer/vulkan_initializers.hpp"
 #include "Renderer/common.hpp"
 #include <chrono>
-
-#ifdef _WIN32
-#define VK_USE_PLATFORM_WIN32_KHR
-#define NOMINMAX
-#endif
-
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>
-
-#define GLM_FORCE_RADIANS
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-
-#include <optional>
-
-namespace helper
-{
-	struct QueueFamilyIndices 
-	{
-		std::optional<uint32_t> graphics_family;
-		std::optional<uint32_t> present_family;
-
-		bool is_complete() 
-		{
-			return graphics_family.has_value() && present_family.has_value();
-		}
-	};
-
-	QueueFamilyIndices find_queue_family_indices(const VkPhysicalDevice& physical_device, const VkSurfaceKHR& surface);
-	
-	uint32_t find_memory_type(uint32_t type_filter, VkMemoryPropertyFlags properties, VkPhysicalDevice physical_device);
-
-	bool create_buffer(
-		VkDevice device,
-		VkPhysicalDevice physical_device,
-		VkDeviceSize buffer_size,
-		VkBufferUsageFlags usage,
-		VkMemoryPropertyFlags memory_properties,
-		VkBuffer& buffer,
-		VkDeviceMemory& buffer_memory);
-
-	bool copy_buffer(
-		VkDevice device,
-		VkCommandPool stage_command_pool,
-		VkQueue queue,
-		VkBuffer& src_buffer,
-		VkBuffer& dst_buffer,
-		VkDeviceSize buffer_size);
-
-	VkShaderModule create_shader_module(VkDevice device, const std::vector<char>& code);
-};
-
-struct Vertex
-{
-	glm::vec2 pos;
-	glm::vec3 color;
-};
-
-struct model
-{
-	std::vector<Vertex> vertices;
-	std::vector<uint16_t> indices;
-};
-
-struct SwapChainSupportDetails
-{
-	VkSurfaceCapabilitiesKHR capabilities;
-	std::vector<VkSurfaceFormatKHR> formats;
-	std::vector<VkPresentModeKHR> present_modes;
-};
-
-struct UniformBufferObject
-{
-	glm::mat4 view;
-	glm::mat4 proj;
-};
 
 struct circles_strcut
 {
@@ -151,7 +74,7 @@ private:
 	
 	// Sample ----------------
 	
-	model circle_model;
+	renderer::model circle_model;
 
 	void setup_circles();
 	circles_strcut circles;
@@ -192,7 +115,7 @@ private:
 	VkPhysicalDevice physical_device = VK_NULL_HANDLE;
 	VkDevice  device = VK_NULL_HANDLE;
 	VkSurfaceKHR surface = VK_NULL_HANDLE;
-	helper::QueueFamilyIndices family_indices;
+	renderer::helper::QueueFamilyIndices family_indices;
 
 	VkRenderPass render_pass;
 

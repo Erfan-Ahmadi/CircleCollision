@@ -24,6 +24,9 @@
     <ClCompile Include="..\..\..\src\circle_collision_simple\circle_collision_simple.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\Renderer\helper.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\src\Renderer\vulkan_initializers.hpp">

@@ -133,6 +133,7 @@
   <ItemGroup>
     <ClCompile Include="..\..\..\src\circle_collision_compute_shader\circle_collision_compute_shader.cpp" />
     <ClCompile Include="..\..\..\src\circle_collision_compute_shader\main.cpp" />
+    <ClCompile Include="..\..\..\src\Renderer\helper.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\src\circle_collision_compute_shader\shaders\shaders.comp" />

@@ -1271,8 +1271,6 @@ void CircleCollisionSimple::update(const uint32_t& current_image)
 	const auto right_wall = (mouse_bounding_enabled && draw) ? mouse_pos.x : INIT_WIDTH;
 	const auto bottom_wall = (mouse_bounding_enabled && draw) ? mouse_pos.y : INIT_HEIGHT;
 
-	const auto t_start = std::chrono::high_resolution_clock::now();
-
 	for (size_t i = 0; i < instance_count; ++i)
 	{
 		if (draw && glm::distance(this->circles.positions[i], mouse_pos) < mouse_draw_radius)

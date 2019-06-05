@@ -64,11 +64,8 @@ void main()
 		velocities[i].x *= -1;
 	}
 
-	for (uint j = 0; j < ubo.count; ++j)
+	for (uint j = i + 1; j < ubo.count; ++j)
 	{
-		if (i == j)
-			continue;
-	
 		const float dx = positions[i].x - positions[j].x;
 		const float dy = positions[i].y - positions[j].y;
 		const float dis2 = (dy * dy + dx * dx);

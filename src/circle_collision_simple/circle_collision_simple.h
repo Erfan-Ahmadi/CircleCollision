@@ -73,7 +73,9 @@ private:
 	bool main_loop();
 	
 	// Sample ----------------
-	
+
+	std::vector<size_t> cols;
+
 	renderer::model circle_model;
 
 	void setup_circles();

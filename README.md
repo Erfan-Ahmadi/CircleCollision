@@ -11,6 +11,9 @@ Implementing Different Methods of Circle to Circle Collision Detection using Vul
  <img src="https://raw.githubusercontent.com/Erfan-Ahmadi/circle_collision/master/docs/Collision-detection-pipeline.png" width="372" height="85"/>
  </p>
 
+**This is not a benchmark!, Although It would give me some ideas and thing to be suspicious about.
+And also I would appreciate optimization ideas and results on your system.**
+
 # Images and Preview
 
 <p align="center">

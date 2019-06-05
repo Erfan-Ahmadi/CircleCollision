@@ -26,6 +26,9 @@ const std::vector<const char*> device_extensions = {
 	VK_KHR_SWAPCHAIN_EXTENSION_NAME
 };
 
+static int64_t sum = 0;
+static size_t count = 0;
+
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
 	mouse_draw_radius += yoffset;
@@ -1268,7 +1271,8 @@ void CircleCollisionSimple::update(const uint32_t& current_image)
 	const auto right_wall = (mouse_bounding_enabled && draw) ? mouse_pos.x : INIT_WIDTH;
 	const auto bottom_wall = (mouse_bounding_enabled && draw) ? mouse_pos.y : INIT_HEIGHT;
 
-	// Optimize : Think Data-Oriented
+	const auto t_start = std::chrono::high_resolution_clock::now();
+
 	for (size_t i = 0; i < instance_count; ++i)
 	{
 		if (draw && glm::distance(this->circles.positions[i], mouse_pos) < mouse_draw_radius)
@@ -1277,7 +1281,12 @@ void CircleCollisionSimple::update(const uint32_t& current_image)
 		}
 
 		this->circles.positions[i] += this->circles.velocities[i] * this->frame_timer;
+	}
 
+	std::vector<std::pair<size_t, size_t>> collided;
+
+	for (size_t i = 0; i < instance_count; ++i)
+	{
 		if (this->circles.positions[i].y - this->circles.scales[i] <= 0)
 		{
 			this->circles.positions[i].y = this->circles.scales[i];
@@ -1300,12 +1309,8 @@ void CircleCollisionSimple::update(const uint32_t& current_image)
 			this->circles.velocities[i].x *= -1;
 		}
 
-
-		for (size_t j = 0; j < instance_count; ++j)
+		for (size_t j = i + 1; j < instance_count; ++j)
 		{
-			if (i == j)
-				continue;
-
 			const auto dx = this->circles.positions[i].x - this->circles.positions[j].x;
 			const auto dy = this->circles.positions[i].y - this->circles.positions[j].y;
 			const auto dis2 = (dy * dy + dx * dx);
@@ -1313,42 +1318,34 @@ void CircleCollisionSimple::update(const uint32_t& current_image)
 
 			if (dis2 < radii * radii)
 			{
-				// Move Away
-				const auto dis = glm::sqrt(dis2);
-				const auto n = glm::vec2(dx / dis, dy / dis);
-				const auto covered = radii - dis;
-				const auto move_vec = n * (covered / 2.0f);
-				this->circles.positions[i] += move_vec;
-				this->circles.positions[j] -= move_vec;
-
-				// Change Velocity Direction
-				const auto m1 = this->circles.scales[i] * 5.0f;
-				const auto m2 = this->circles.scales[j] * 5.0f;
-				const auto p = 2 * (glm::dot(n, this->circles.velocities[i]) - glm::dot(n, this->circles.velocities[j])) / (m1 + m2);
-				this->circles.velocities[i] = (this->circles.velocities[i] - n * m2 * p);
-				this->circles.velocities[j] = (this->circles.velocities[j] + n * m1 * p);
+				collided.push_back(std::pair<size_t, size_t>(i, j));
 			}
 		}
+	}
 
-		// Check Collision With Mouse
-		if (mouse_drawing_enabled && draw)
-		{
-			const float dx = this->circles.positions[i].x - mouse_pos.x;
-			const float dy = this->circles.positions[i].y - mouse_pos.y;
-			const auto dis2 = (dy * dy + dx * dx);
-			const auto radii = this->circles.scales[i] + mouse_draw_radius;
+	for (size_t k = 0; k < collided.size(); ++k)
+	{
+		int i = collided[k].first;
+		int j = collided[k].second;
 
-			if (dis2 < radii * radii)
-			{
-				// Move Away
-				const auto dis = glm::sqrt(dis2);
-				const auto n = glm::vec2(dx / dis, dy / dis);
-				const auto covered = radii - dis;
-				const auto move_vec = n * (covered);
-				this->circles.positions[i] += move_vec;
-			}
-		}
+		const auto dx = this->circles.positions[i].x - this->circles.positions[j].x;
+		const auto dy = this->circles.positions[i].y - this->circles.positions[j].y;
+		const auto radii = this->circles.scales[i] + this->circles.scales[j];
 
+		// Move Away
+		const auto dis = glm::sqrt((dy * dy + dx * dx));
+		const auto n = glm::vec2(dx / dis, dy / dis);
+		const auto covered = radii - dis;
+		const auto move_vec = n * (covered / 2.0f);
+		this->circles.positions[i] += move_vec;
+		this->circles.positions[j] -= move_vec;
+
+		// Change Velocity Direction
+		const auto m1 = this->circles.scales[i] * 5.0f;
+		const auto m2 = this->circles.scales[j] * 5.0f;
+		const auto p = 2 * (glm::dot(n, this->circles.velocities[i]) - glm::dot(n, this->circles.velocities[j])) / (m1 + m2);
+		this->circles.velocities[i] = (this->circles.velocities[i] - n * m2 * p);
+		this->circles.velocities[j] = (this->circles.velocities[j] + n * m1 * p);
 	}
 
 	if (draw)
@@ -1481,6 +1478,9 @@ bool CircleCollisionSimple::main_loop()
 
 			sprintf_s(title, "%d FPS in %.8f (ms)", this->last_fps, this->frame_timer);
 
+			sum += fps_timer;
+			count += this->frame_counter;
+
 			glfwSetWindowTitle(this->window, title);
 
 			this->frame_counter = 0;
@@ -1488,6 +1488,15 @@ bool CircleCollisionSimple::main_loop()
 		}
 
 		glfwPollEvents();
+
+		if (count > 500)
+		{
+			std::cout << "Average Frame Time: " << (float)sum / count << std::endl;
+			sum = 0;
+			count = 0;
+			//return true;
+		}
+
 	}
 
 	return true;

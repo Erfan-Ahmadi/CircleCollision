@@ -1341,11 +1341,9 @@ void CircleCollisionSIMD::update(const uint32_t& current_image)
 	size_t row = 0;
 	size_t column = 1;
 
-	size_t collisions = 0;
-	
 	std::vector<std::pair<size_t, size_t>> collided;
 
-#if !defined(SIMD)
+#if defined(SIMD)
 	for (size_t k = 0; k < n / 8; ++k)
 	{
 		for (short i = 0; i < 8; ++i)
@@ -1439,7 +1437,6 @@ void CircleCollisionSIMD::update(const uint32_t& current_image)
 			if (resultf[m] == 0)
 			{
 				collided.push_back(std::pair<size_t, size_t>(checks[m * 2], checks[m * 2 + 1]));
-				collisions++;
 			}
 		}
 	}
@@ -1457,7 +1454,6 @@ void CircleCollisionSIMD::update(const uint32_t& current_image)
 			if (dis2 < radii * radii)
 			{
 				collided.push_back(std::pair<size_t, size_t>(i, j));
-				collisions++;
 			}
 		}
 	}

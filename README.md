@@ -61,6 +61,8 @@ This Project Is For Learning Purposes of Following Topics
 - Brute Force
   - [x] CPU
   - [x] Compute Shader
+  - [x] SIMD (AVX2)
+  - [ ] Multi-Threaded
   
 
 # Build

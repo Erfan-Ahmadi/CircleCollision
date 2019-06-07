@@ -1,4 +1,4 @@
-#include "circle_collision_simple.h"
+#include "circle_collision_simple_simd_avx2.h"
 
 #include <set>
 #include <fstream>
@@ -12,8 +12,20 @@
 
 #define VERTEX_BUFFER_BIND_ID				0 // PER VERTEX
 #define COLOR_BUFFER_BIND_ID				1 // PER INSTANCE
-#define POSITIONS_BUFFER_BIND_ID			2 // PER INSTANCE
-#define SCALE_BUFFER_BIND_ID				3 // PER INSTANCE
+#define XPOSITIONS_BUFFER_BIND_ID			2 // PER INSTANCE
+#define YPOSITIONS_BUFFER_BIND_ID			3 // PER INSTANCE
+#define SCALE_BUFFER_BIND_ID				4 // PER INSTANCE
+
+#include <immintrin.h>
+
+// SIMD Constants
+#define SIMD
+
+constexpr	size_t	twos = (instance_count * (instance_count - 1)) / 2;
+constexpr	size_t	left = (twos % 8);
+constexpr	size_t	n = twos - left;
+static		__m256i base = _mm256_setr_epi32(0, 1, 2, 3, 4, 5, 6, 7);
+int32_t		checks[16];
 
 using namespace renderer;
 
@@ -39,7 +51,7 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 
 static void resize_callback(GLFWwindow* window, int width, int height)
 {
-	auto app = reinterpret_cast<CircleCollisionSimple*>(glfwGetWindowUserPointer(window));
+	auto app = reinterpret_cast<CircleCollisionSIMD*>(glfwGetWindowUserPointer(window));
 	app->window_resize();
 }
 
@@ -62,9 +74,9 @@ static std::vector<char> read_file(const std::string& fileName)
 	return buffer;
 }
 
-void CircleCollisionSimple::initialize()
+void CircleCollisionSIMD::initialize()
 {
-	this->cols.resize((instance_count * (instance_count - 1) / 2) * sizeof(size_t));
+	this->cols.resize(twos * sizeof(size_t));
 
 	srand(time(NULL));
 	validation_layers_enabled = false;
@@ -74,7 +86,7 @@ void CircleCollisionSimple::initialize()
 	this->app_path = std::string(current_path);
 }
 
-bool CircleCollisionSimple::run()
+bool CircleCollisionSIMD::run()
 {
 	if (!setup_window())
 		return false;
@@ -91,7 +103,7 @@ bool CircleCollisionSimple::run()
 	return true;
 }
 
-bool CircleCollisionSimple::setup_window()
+bool CircleCollisionSIMD::setup_window()
 {
 	glfwInit();
 
@@ -106,7 +118,7 @@ bool CircleCollisionSimple::setup_window()
 	return true;
 }
 
-bool CircleCollisionSimple::setup_vulkan()
+bool CircleCollisionSIMD::setup_vulkan()
 {
 	if (!create_instance())
 		return false;
@@ -154,7 +166,7 @@ bool CircleCollisionSimple::setup_vulkan()
 	return true;
 }
 
-bool CircleCollisionSimple::create_instance()
+bool CircleCollisionSIMD::create_instance()
 {
 	VkApplicationInfo app_info = {};
 	app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -274,7 +286,7 @@ bool CircleCollisionSimple::create_instance()
 	return result == VK_SUCCESS;
 }
 
-bool CircleCollisionSimple::set_up_debug_messenger()
+bool CircleCollisionSIMD::set_up_debug_messenger()
 {
 #if defined(_DEBUG)
 	if (!validation_layers_enabled)
@@ -312,7 +324,7 @@ bool CircleCollisionSimple::set_up_debug_messenger()
 #endif
 }
 
-bool CircleCollisionSimple::pick_physical_device()
+bool CircleCollisionSIMD::pick_physical_device()
 {
 	uint32_t available_physical_devices_count = 0;
 	vkEnumeratePhysicalDevices(this->instance, &available_physical_devices_count, nullptr);
@@ -355,7 +367,7 @@ bool CircleCollisionSimple::pick_physical_device()
 	return true;
 }
 
-bool CircleCollisionSimple::check_device_extensions_support()
+bool CircleCollisionSIMD::check_device_extensions_support()
 {
 	uint32_t available_extensions_count;
 	vkEnumerateDeviceExtensionProperties(this->physical_device, nullptr, &available_extensions_count, nullptr);
@@ -370,7 +382,7 @@ bool CircleCollisionSimple::check_device_extensions_support()
 	return required_extensions.empty();
 }
 
-bool CircleCollisionSimple::create_logical_device()
+bool CircleCollisionSIMD::create_logical_device()
 {
 	if (!check_device_extensions_support())
 		return false;
@@ -421,12 +433,12 @@ bool CircleCollisionSimple::create_logical_device()
 	return result == VK_SUCCESS;
 }
 
-bool CircleCollisionSimple::create_surface()
+bool CircleCollisionSIMD::create_surface()
 {
 	return glfwCreateWindowSurface(this->instance, this->window, nullptr, &this->surface) == VK_SUCCESS;
 }
 
-bool CircleCollisionSimple::create_swap_chain()
+bool CircleCollisionSIMD::create_swap_chain()
 {
 	// Get Properties
 
@@ -560,7 +572,7 @@ bool CircleCollisionSimple::create_swap_chain()
 	return true;
 }
 
-bool CircleCollisionSimple::create_image_views()
+bool CircleCollisionSIMD::create_image_views()
 {
 	this->swap_chain_image_views.resize(this->swap_chain_images.size());
 
@@ -588,7 +600,7 @@ bool CircleCollisionSimple::create_image_views()
 	return true;
 }
 
-bool CircleCollisionSimple::create_renderpass()
+bool CircleCollisionSIMD::create_renderpass()
 {
 	// Graphics Subpass
 	VkAttachmentReference color_attach_ref = {};
@@ -638,7 +650,7 @@ bool CircleCollisionSimple::create_renderpass()
 	return true;
 }
 
-bool CircleCollisionSimple::create_descriptor_set_layout()
+bool CircleCollisionSIMD::create_descriptor_set_layout()
 {
 	VkDescriptorSetLayoutBinding descriptor_set_binding = {};
 	descriptor_set_binding.binding = 0;
@@ -658,7 +670,7 @@ bool CircleCollisionSimple::create_descriptor_set_layout()
 	return true;
 }
 
-bool CircleCollisionSimple::create_graphics_pipeline()
+bool CircleCollisionSIMD::create_graphics_pipeline()
 {
 	auto vert_shader = read_file(this->app_path + "\\..\\..\\..\\src\\circle_collision_simple\\shaders\\shaders.vert.spv");
 	auto frag_shader = read_file(this->app_path + "\\..\\..\\..\\src\\circle_collision_simple\\shaders\\shaders.frag.spv");
@@ -691,16 +703,18 @@ bool CircleCollisionSimple::create_graphics_pipeline()
 	{
 		initializers::vertex_input_binding_description(VERTEX_BUFFER_BIND_ID, sizeof(vertex), VK_VERTEX_INPUT_RATE_VERTEX),
 		initializers::vertex_input_binding_description(COLOR_BUFFER_BIND_ID, sizeof(glm::vec3), VK_VERTEX_INPUT_RATE_INSTANCE),
-		initializers::vertex_input_binding_description(POSITIONS_BUFFER_BIND_ID, sizeof(glm::vec2), VK_VERTEX_INPUT_RATE_INSTANCE),
+		initializers::vertex_input_binding_description(XPOSITIONS_BUFFER_BIND_ID, sizeof(float), VK_VERTEX_INPUT_RATE_INSTANCE),
+		initializers::vertex_input_binding_description(YPOSITIONS_BUFFER_BIND_ID, sizeof(float), VK_VERTEX_INPUT_RATE_INSTANCE),
 		initializers::vertex_input_binding_description(SCALE_BUFFER_BIND_ID, sizeof(float), VK_VERTEX_INPUT_RATE_INSTANCE),
 	};
 
 	std::vector<VkVertexInputAttributeDescription> attributes =
 	{
 		initializers::vertex_input_attribute_description(VERTEX_BUFFER_BIND_ID,		0, VK_FORMAT_R32G32_SFLOAT, offsetof(vertex, pos)),
-		initializers::vertex_input_attribute_description(POSITIONS_BUFFER_BIND_ID,	1, VK_FORMAT_R32G32_SFLOAT, 0),
-		initializers::vertex_input_attribute_description(COLOR_BUFFER_BIND_ID,		2, VK_FORMAT_R32G32B32_SFLOAT, 0),
-		initializers::vertex_input_attribute_description(SCALE_BUFFER_BIND_ID,		3, VK_FORMAT_R32_SFLOAT, 0),
+		initializers::vertex_input_attribute_description(XPOSITIONS_BUFFER_BIND_ID,	1, VK_FORMAT_R32_SFLOAT, 0),
+		initializers::vertex_input_attribute_description(YPOSITIONS_BUFFER_BIND_ID,	2, VK_FORMAT_R32_SFLOAT, 0),
+		initializers::vertex_input_attribute_description(COLOR_BUFFER_BIND_ID,		3, VK_FORMAT_R32G32B32_SFLOAT, 0),
+		initializers::vertex_input_attribute_description(SCALE_BUFFER_BIND_ID,		4, VK_FORMAT_R32_SFLOAT, 0),
 	};
 
 	// VI
@@ -829,7 +843,7 @@ bool CircleCollisionSimple::create_graphics_pipeline()
 	return true;
 }
 
-bool CircleCollisionSimple::create_vertex_buffer()
+bool CircleCollisionSIMD::create_vertex_buffer()
 {
 	get_circle_model(30, &this->circle_model);
 	const VkDeviceSize buffer_size = sizeof(vertex) * this->circle_model.vertices.size();
@@ -874,7 +888,7 @@ bool CircleCollisionSimple::create_vertex_buffer()
 	return true;
 }
 
-bool CircleCollisionSimple::create_index_buffer()
+bool CircleCollisionSIMD::create_index_buffer()
 {
 	const VkDeviceSize buffer_size = sizeof(uint16_t) * this->circle_model.indices.size();
 
@@ -918,7 +932,7 @@ bool CircleCollisionSimple::create_index_buffer()
 	return true;
 }
 
-bool CircleCollisionSimple::create_instance_buffers()
+bool CircleCollisionSIMD::create_instance_buffers()
 {
 	setup_circles();
 
@@ -932,7 +946,7 @@ bool CircleCollisionSimple::create_instance_buffers()
 	return true;
 }
 
-bool CircleCollisionSimple::create_uniform_buffers()
+bool CircleCollisionSIMD::create_uniform_buffers()
 {
 	const auto buffer_size = sizeof(UniformBufferObject);
 
@@ -958,7 +972,7 @@ bool CircleCollisionSimple::create_uniform_buffers()
 	return true;
 }
 
-bool CircleCollisionSimple::create_descriptor_pool()
+bool CircleCollisionSIMD::create_descriptor_pool()
 {
 	VkDescriptorPoolSize pool_size = {};
 	pool_size.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -978,7 +992,7 @@ bool CircleCollisionSimple::create_descriptor_pool()
 	return true;
 }
 
-bool CircleCollisionSimple::create_descriptor_sets()
+bool CircleCollisionSIMD::create_descriptor_sets()
 {
 	std::vector<VkDescriptorSetLayout> layouts(swap_chain_images.size(), ubo_descriptor_set_layout);
 
@@ -1013,7 +1027,7 @@ bool CircleCollisionSimple::create_descriptor_sets()
 	}
 }
 
-bool CircleCollisionSimple::create_frame_buffers()
+bool CircleCollisionSIMD::create_frame_buffers()
 {
 	this->swap_chain_frame_buffers.resize(this->swap_chain_image_views.size());
 
@@ -1043,7 +1057,7 @@ bool CircleCollisionSimple::create_frame_buffers()
 	return true;
 }
 
-bool CircleCollisionSimple::create_command_pool()
+bool CircleCollisionSIMD::create_command_pool()
 {
 	VkCommandPoolCreateInfo create_info = {};
 
@@ -1060,7 +1074,7 @@ bool CircleCollisionSimple::create_command_pool()
 	return true;
 }
 
-bool CircleCollisionSimple::create_command_buffers()
+bool CircleCollisionSIMD::create_command_buffers()
 {
 	this->command_buffers.resize(this->swap_chain_frame_buffers.size());
 
@@ -1107,7 +1121,8 @@ bool CircleCollisionSimple::create_command_buffers()
 
 			VkBuffer vertex_buffers[] = { this->vertex_buffer };
 			VkBuffer colors_buffers[] = { this->colors_buffer };
-			VkBuffer positions_buffers[] = { this->positions_buffer };
+			VkBuffer x_positions_buffers[] = { this->x_positions_buffer };
+			VkBuffer y_positions_buffers[] = { this->y_positions_buffer };
 			VkBuffer scales_buffers[] = { this->scales_buffer };
 			VkDeviceSize offsets[] = { 0 };
 
@@ -1118,7 +1133,9 @@ bool CircleCollisionSimple::create_command_buffers()
 
 			vkCmdBindVertexBuffers(this->command_buffers[i], COLOR_BUFFER_BIND_ID, 1, colors_buffers, offsets);
 
-			vkCmdBindVertexBuffers(this->command_buffers[i], POSITIONS_BUFFER_BIND_ID, 1, positions_buffers, offsets);
+			vkCmdBindVertexBuffers(this->command_buffers[i], XPOSITIONS_BUFFER_BIND_ID, 1, x_positions_buffers, offsets);
+			
+			vkCmdBindVertexBuffers(this->command_buffers[i], YPOSITIONS_BUFFER_BIND_ID, 1, y_positions_buffers, offsets);
 
 			vkCmdBindVertexBuffers(this->command_buffers[i], SCALE_BUFFER_BIND_ID, 1, scales_buffers, offsets);
 
@@ -1138,7 +1155,7 @@ bool CircleCollisionSimple::create_command_buffers()
 	return true;
 }
 
-bool CircleCollisionSimple::create_sync_objects()
+bool CircleCollisionSIMD::create_sync_objects()
 {
 	this->num_frames = this->swap_chain_images.size();
 
@@ -1168,7 +1185,7 @@ bool CircleCollisionSimple::create_sync_objects()
 	return true;
 }
 
-bool CircleCollisionSimple::cleanup_swap_chain()
+bool CircleCollisionSIMD::cleanup_swap_chain()
 {
 	for (auto& frame_buffer : this->swap_chain_frame_buffers)
 		vkDestroyFramebuffer(this->device, frame_buffer, nullptr);
@@ -1193,7 +1210,7 @@ bool CircleCollisionSimple::cleanup_swap_chain()
 	return true;
 }
 
-bool CircleCollisionSimple::recreate_swap_chain()
+bool CircleCollisionSIMD::recreate_swap_chain()
 {
 	vkDeviceWaitIdle(this->device);
 
@@ -1229,7 +1246,7 @@ bool CircleCollisionSimple::recreate_swap_chain()
 	return true;
 }
 
-bool CircleCollisionSimple::set_viewport_scissor()
+bool CircleCollisionSIMD::set_viewport_scissor()
 {
 	this->viewport = {};
 	viewport.x = 0.0f;
@@ -1246,7 +1263,18 @@ bool CircleCollisionSimple::set_viewport_scissor()
 	return true;
 }
 
-void CircleCollisionSimple::update(const uint32_t& current_image)
+template <class V, class T>
+inline void print_vec(V& vec)
+{
+	T* vecf = reinterpret_cast<T*>(&vec);
+
+	for (short i = 0; i < 8; ++i)
+		std::cout << "(" << i << "): " << vecf[i] << std::endl;
+
+	std::cout << std::endl;
+}
+
+void CircleCollisionSIMD::update(const uint32_t& current_image)
 {
 	static auto start_time = std::chrono::high_resolution_clock::now();
 
@@ -1273,49 +1301,158 @@ void CircleCollisionSimple::update(const uint32_t& current_image)
 	const auto right_wall = (mouse_bounding_enabled && draw) ? mouse_pos.x : INIT_WIDTH;
 	const auto bottom_wall = (mouse_bounding_enabled && draw) ? mouse_pos.y : INIT_HEIGHT;
 
-	//ZeroMemory(this->firsts, sizeof(size_t) * instance_count);
-	//ZeroMemory(this->seconds, sizeof(size_t) * instance_count);
-
 	for (size_t i = 0; i < instance_count; ++i)
 	{
-		if (draw && glm::distance(this->circles.positions[i], mouse_pos) < mouse_draw_radius)
+		//if (draw && glm::distance(this->circles.positions[i], mouse_pos) < mouse_draw_radius)
+		//{
+		//	this->circles.velocities[i] = -1.0f * (mouse_pos - this->circles.positions[i]) * 10e-3f;
+		//}
+
+		this->circles.x_positions[i] += this->circles.velocities[i].x * this->frame_timer;
+		this->circles.y_positions[i] += this->circles.velocities[i].y * this->frame_timer;
+	}
+
+	// Handle Walls
+	for (size_t i = 0; i < instance_count; ++i)
+	{
+		if (this->circles.y_positions[i] - this->circles.scales[i] <= 0)
 		{
-			this->circles.velocities[i] = -1.0f * (mouse_pos - this->circles.positions[i]) * 10e-3f;
+			this->circles.y_positions[i] = this->circles.scales[i];
+			this->circles.velocities[i].y *= -1;
+		}
+		else if (this->circles.y_positions[i] + this->circles.scales[i] >= bottom_wall)
+		{
+			this->circles.y_positions[i] = bottom_wall - this->circles.scales[i];
+			this->circles.velocities[i].y *= -1;
 		}
 
-		this->circles.positions[i] += this->circles.velocities[i] * this->frame_timer;
+		if (this->circles.x_positions[i] - this->circles.scales[i] <= 0)
+		{
+			this->circles.x_positions[i] = this->circles.scales[i];
+			this->circles.velocities[i].x *= -1;
+		}
+		else if (this->circles.x_positions[i] + this->circles.scales[i] >= right_wall)
+		{
+			this->circles.x_positions[i] = right_wall - this->circles.scales[i];
+			this->circles.velocities[i].x *= -1;
+		}
 	}
+
+	const auto t1 = std::chrono::high_resolution_clock::now();
+
+
+	size_t row = 0;
+	size_t column = 1;
 
 	size_t collisions = 0;
 
+#if defined(SIMD)
+	for (size_t k = 0; k < n / 8; ++k)
+	{
+		for (short i = 0; i < 8; ++i)
+		{
+			checks[i * 2] = row;
+			checks[i * 2 + 1] = column;
+
+			if (++column > instance_count - 1)
+			{
+				row++;
+				column = row + 1;
+			}
+		}
+
+		const __m256 first_x = _mm256_setr_ps(
+			circles.x_positions[checks[0]],
+			circles.x_positions[checks[2]],
+			circles.x_positions[checks[4]],
+			circles.x_positions[checks[6]],
+			circles.x_positions[checks[8]],
+			circles.x_positions[checks[10]],
+			circles.x_positions[checks[12]],
+			circles.x_positions[checks[14]]);
+		
+		const __m256 second_x = _mm256_setr_ps(
+			circles.x_positions[checks[1]],
+			circles.x_positions[checks[3]],
+			circles.x_positions[checks[5]],
+			circles.x_positions[checks[7]],
+			circles.x_positions[checks[9]],
+			circles.x_positions[checks[11]],
+			circles.x_positions[checks[13]],
+			circles.x_positions[checks[15]]);
+
+		const __m256 dx = _mm256_sub_ps(second_x, first_x);
+
+		const __m256 first_y = _mm256_setr_ps(
+			circles.y_positions[checks[0]],
+			circles.y_positions[checks[2]],
+			circles.y_positions[checks[4]],
+			circles.y_positions[checks[6]],
+			circles.y_positions[checks[8]],
+			circles.y_positions[checks[10]],
+			circles.y_positions[checks[12]],
+			circles.y_positions[checks[14]]);
+		
+		const __m256 second_y = _mm256_setr_ps(
+			circles.y_positions[checks[1]],
+			circles.y_positions[checks[3]],
+			circles.y_positions[checks[5]],
+			circles.y_positions[checks[7]],
+			circles.y_positions[checks[9]],
+			circles.y_positions[checks[11]],
+			circles.y_positions[checks[13]],
+			circles.y_positions[checks[15]]);
+
+		const __m256 dy = _mm256_sub_ps(second_y, first_y);
+
+		const __m256 dis2 = _mm256_fmadd_ps(dy, dy, _mm256_mul_ps(dx, dx));
+
+		const __m256 first_s = _mm256_setr_ps(
+			circles.scales[checks[0]],
+			circles.scales[checks[2]],
+			circles.scales[checks[4]],
+			circles.scales[checks[6]],
+			circles.scales[checks[8]],
+			circles.scales[checks[10]],
+			circles.scales[checks[12]],
+			circles.scales[checks[14]]);
+		
+		const __m256 second_s = _mm256_setr_ps(
+			circles.scales[checks[1]],
+			circles.scales[checks[3]],
+			circles.scales[checks[5]],
+			circles.scales[checks[7]],
+			circles.scales[checks[9]],
+			circles.scales[checks[11]],
+			circles.scales[checks[13]],
+			circles.scales[checks[15]]);
+
+		const __m256 radii = _mm256_add_ps(first_s, second_s);
+		const __m256 radii2 = _mm256_mul_ps(radii, radii);
+
+		const __m256 result = _mm256_cmp_ps(dis2, radii2, _CMP_GT_OQ);
+
+		float resultf[8];
+		_mm256_storeu_ps(resultf, result);
+
+		for (short m = 0; m < 8; ++m)
+		{
+			if (resultf[m] == 0)
+			{
+				this->cols[collisions * 2] = checks[m * 2];
+				this->cols[collisions * 2 + 1] = checks[m * 2 + 1];
+				collisions++;
+			}
+		}
+	}
+
+#else
 	for (size_t i = 0; i < instance_count; ++i)
 	{
-		if (this->circles.positions[i].y - this->circles.scales[i] <= 0)
-		{
-			this->circles.positions[i].y = this->circles.scales[i];
-			this->circles.velocities[i].y *= -1;
-		}
-		else if (this->circles.positions[i].y + this->circles.scales[i] >= bottom_wall)
-		{
-			this->circles.positions[i].y = bottom_wall - this->circles.scales[i];
-			this->circles.velocities[i].y *= -1;
-		}
-
-		if (this->circles.positions[i].x - this->circles.scales[i] <= 0)
-		{
-			this->circles.positions[i].x = this->circles.scales[i];
-			this->circles.velocities[i].x *= -1;
-		}
-		else if (this->circles.positions[i].x + this->circles.scales[i] >= right_wall)
-		{
-			this->circles.positions[i].x = right_wall - this->circles.scales[i];
-			this->circles.velocities[i].x *= -1;
-		}
-
 		for (size_t j = i + 1; j < instance_count; ++j)
 		{
-			const auto dx = this->circles.positions[i].x - this->circles.positions[j].x;
-			const auto dy = this->circles.positions[i].y - this->circles.positions[j].y;
+			const auto dx = this->circles.x_positions[i] - this->circles.x_positions[j];
+			const auto dy = this->circles.y_positions[i] - this->circles.y_positions[j];
 			const auto dis2 = (dy * dy + dx * dx);
 			const auto radii = this->circles.scales[i] + this->circles.scales[j];
 
@@ -1327,14 +1464,18 @@ void CircleCollisionSimple::update(const uint32_t& current_image)
 			}
 		}
 	}
+#endif
 
+	const auto t2 = std::chrono::high_resolution_clock::now();
+
+	// Takes Less than 0.1 (ms) Not Worth Optimizing Now
 	for (size_t k = 0; k < collisions; k += 2)
 	{
 		int i = this->cols[k];
 		int j = this->cols[k + 1];
 
-		const auto dx = this->circles.positions[i].x - this->circles.positions[j].x;
-		const auto dy = this->circles.positions[i].y - this->circles.positions[j].y;
+		const auto dx = this->circles.x_positions[i] - this->circles.x_positions[j];
+		const auto dy = this->circles.y_positions[i] - this->circles.y_positions[j];
 		const auto radii = this->circles.scales[i] + this->circles.scales[j];
 
 		// Move Away
@@ -1342,8 +1483,10 @@ void CircleCollisionSimple::update(const uint32_t& current_image)
 		const auto n = glm::vec2(dx / dis, dy / dis);
 		const auto covered = radii - dis;
 		const auto move_vec = n * (covered / 2.0f);
-		this->circles.positions[i] += move_vec;
-		this->circles.positions[j] -= move_vec;
+		this->circles.x_positions[i] += move_vec.x;
+		this->circles.y_positions[i] += move_vec.y;
+		this->circles.x_positions[j] -= move_vec.x;
+		this->circles.y_positions[j] -= move_vec.y;
 
 		// Change Velocity Direction
 		const auto m1 = this->circles.scales[i] * 5.0f;
@@ -1351,15 +1494,25 @@ void CircleCollisionSimple::update(const uint32_t& current_image)
 		const auto p = 2 * (glm::dot(n, this->circles.velocities[i]) - glm::dot(n, this->circles.velocities[j])) / (m1 + m2);
 		this->circles.velocities[i] = (this->circles.velocities[i] - n * m2 * p);
 		this->circles.velocities[j] = (this->circles.velocities[j] + n * m1 * p);
-	}
+}
+
+	const auto t3 = std::chrono::high_resolution_clock::now();
+	const auto detection = std::chrono::duration<double, std::milli>(t2 - t1).count();
+	const auto handle = std::chrono::duration<double, std::milli>(t3 - t2).count();
+
+	sprintf_s(title, "Detection: %.8f (ms) - Handle: %.8f (ms)", detection, handle);
 
 	if (draw)
 		draw = false;
 
-	static const auto positions_update_size = sizeof(glm::vec2) * instance_count;
-	vkMapMemory(this->device, this->positions_buffer_memory, 0, positions_update_size, 0, &data);
-	memcpy(data, this->circles.positions.data(), positions_update_size);
-	vkUnmapMemory(this->device, this->positions_buffer_memory);
+	static const auto positions_update_size = sizeof(float) * instance_count;
+	vkMapMemory(this->device, this->x_positions_buffer_memory, 0, positions_update_size, 0, &data);
+	memcpy(data, this->circles.x_positions.data(), positions_update_size);
+	vkUnmapMemory(this->device, this->x_positions_buffer_memory);
+	
+	vkMapMemory(this->device, this->y_positions_buffer_memory, 0, positions_update_size, 0, &data);
+	memcpy(data, this->circles.y_positions.data(), positions_update_size);
+	vkUnmapMemory(this->device, this->y_positions_buffer_memory);
 
 	UniformBufferObject ubo = {};
 
@@ -1372,7 +1525,7 @@ void CircleCollisionSimple::update(const uint32_t& current_image)
 	vkUnmapMemory(this->device, this->ubo_buffers_memory[current_image]);
 }
 
-bool CircleCollisionSimple::draw_frame()
+bool CircleCollisionSIMD::draw_frame()
 {
 	vkWaitForFences(this->device, 1, &this->draw_fences[this->current_frame], VK_TRUE, std::numeric_limits<uint64_t>::max());
 
@@ -1458,7 +1611,7 @@ bool CircleCollisionSimple::draw_frame()
 	return true;
 }
 
-bool CircleCollisionSimple::main_loop()
+bool CircleCollisionSIMD::main_loop()
 {
 	this->last_timestamp = std::chrono::high_resolution_clock::now();
 
@@ -1481,7 +1634,7 @@ bool CircleCollisionSimple::main_loop()
 		{
 			this->last_fps = static_cast<uint32_t>((float)frame_counter * (1000.0f / fps_timer));
 
-			sprintf_s(title, "%d FPS in %.8f (ms)", this->last_fps, this->frame_timer);
+			//sprintf_s(title, "%d FPS in %.8f (ms)", this->last_fps, this->frame_timer);
 
 			sum += fps_timer;
 			count += this->frame_counter;
@@ -1507,7 +1660,7 @@ bool CircleCollisionSimple::main_loop()
 	return true;
 }
 
-bool CircleCollisionSimple::release()
+bool CircleCollisionSIMD::release()
 {
 	if (is_released)
 		return true;
@@ -1534,8 +1687,11 @@ bool CircleCollisionSimple::release()
 		vkDestroyBuffer(this->device, this->colors_buffer, nullptr);
 		vkFreeMemory(this->device, this->colors_buffer_memory, nullptr);
 
-		vkDestroyBuffer(this->device, this->positions_buffer, nullptr);
-		vkFreeMemory(this->device, this->positions_buffer_memory, nullptr);
+		vkDestroyBuffer(this->device, this->x_positions_buffer, nullptr);
+		vkFreeMemory(this->device, this->x_positions_buffer_memory, nullptr);
+		
+		vkDestroyBuffer(this->device, this->y_positions_buffer, nullptr);
+		vkFreeMemory(this->device, this->y_positions_buffer_memory, nullptr);
 
 		vkDestroyBuffer(this->device, this->scales_buffer, nullptr);
 		vkFreeMemory(this->device, this->scales_buffer_memory, nullptr);
@@ -1575,12 +1731,12 @@ bool CircleCollisionSimple::release()
 	return true;
 }
 
-void CircleCollisionSimple::window_resize()
+void CircleCollisionSIMD::window_resize()
 {
 	this->should_recreate_swapchain = true;
 }
 
-bool CircleCollisionSimple::create_colors_buffer()
+bool CircleCollisionSIMD::create_colors_buffer()
 {
 	const VkDeviceSize buffer_size = sizeof(glm::vec3) * instance_count;
 
@@ -1604,9 +1760,9 @@ bool CircleCollisionSimple::create_colors_buffer()
 	return true;
 }
 
-bool CircleCollisionSimple::create_positions_buffer()
+bool CircleCollisionSIMD::create_positions_buffer()
 {
-	const VkDeviceSize buffer_size = sizeof(glm::vec2) * instance_count;
+	const VkDeviceSize buffer_size = sizeof(float) * instance_count;
 
 	if (!helper::create_buffer(
 		this->device,
@@ -1614,21 +1770,37 @@ bool CircleCollisionSimple::create_positions_buffer()
 		buffer_size,
 		VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
 		VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT,
-		this->positions_buffer,
-		this->positions_buffer_memory))
+		this->x_positions_buffer,
+		this->x_positions_buffer_memory))
 	{
 		return false;
 	}
 
 	void* data = nullptr;
-	vkMapMemory(this->device, this->positions_buffer_memory, 0, buffer_size, 0, &data);
-	memcpy(data, this->circles.positions.data(), buffer_size);
-	vkUnmapMemory(this->device, this->positions_buffer_memory);
+	vkMapMemory(this->device, this->x_positions_buffer_memory, 0, buffer_size, 0, &data);
+	memcpy(data, this->circles.x_positions.data(), buffer_size);
+	vkUnmapMemory(this->device, this->x_positions_buffer_memory);
+	
+	if (!helper::create_buffer(
+		this->device,
+		this->physical_device,
+		buffer_size,
+		VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+		VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT,
+		this->y_positions_buffer,
+		this->y_positions_buffer_memory))
+	{
+		return false;
+	}
+
+	vkMapMemory(this->device, this->y_positions_buffer_memory, 0, buffer_size, 0, &data);
+	memcpy(data, this->circles.y_positions.data(), buffer_size);
+	vkUnmapMemory(this->device, this->y_positions_buffer_memory);
 
 	return true;
 }
 
-bool CircleCollisionSimple::create_scales_buffer()
+bool CircleCollisionSIMD::create_scales_buffer()
 {
 	const VkDeviceSize buffer_size = sizeof(float) * instance_count;
 
@@ -1672,7 +1844,7 @@ bool CircleCollisionSimple::create_scales_buffer()
 	return true;
 }
 
-void CircleCollisionSimple::setup_circles()
+void CircleCollisionSIMD::setup_circles()
 {
 	this->circles.resize(instance_count);
 
@@ -1683,9 +1855,8 @@ void CircleCollisionSimple::setup_circles()
 	{
 		this->circles.scales[i] = min_size + (rand() % (max_size - min_size));
 		this->circles.velocities[i] = relative_velocity * glm::vec2(((rand() % 100) / 200.0f) * ((rand() % 2) * 2 - 1.0f), (rand() % 100) / 200.0f * ((rand() % 2) * 2 - 1.0f)) / glm::sqrt(this->circles.scales[i]) * 3.0f;
-		this->circles.positions[i] = glm::vec2(
-			this->circles.scales[i] + rand() % (INIT_WIDTH - 2 * static_cast<int>(this->circles.scales[i])),
-			this->circles.scales[i] + rand() % (INIT_HEIGHT - 2 * static_cast<int>(this->circles.scales[i])));
+		this->circles.x_positions[i] = this->circles.scales[i] + rand() % (INIT_WIDTH - 2 * static_cast<int>(this->circles.scales[i]));
+		this->circles.y_positions[i] = this->circles.scales[i] + rand() % (INIT_HEIGHT - 2 * static_cast<int>(this->circles.scales[i]));
 		this->circles.colors[i] = glm::vec3((rand() % 255) / 255.0f, (rand() % 255) / 255.0f, (rand() % 255) / 255.0f);
 	}
 }

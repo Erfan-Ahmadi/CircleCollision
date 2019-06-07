@@ -33,7 +33,7 @@ static float mouse_draw_radius = 30.0f;
 
 static char title[64];
 
-constexpr uint64_t	instance_count = (1 << 12);
+constexpr uint64_t	instance_count = (1 << 10);
 
 #define Log(str) std::cout << str << std::endl
 

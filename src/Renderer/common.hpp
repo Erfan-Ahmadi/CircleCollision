@@ -23,6 +23,9 @@
 constexpr int INIT_WIDTH = 1280;
 constexpr int INIT_HEIGHT = 720;
 
+constexpr uint64_t	instance_count = (1 << 10);
+constexpr size_t twos = (instance_count * (instance_count - 1) / 2);
+
 constexpr bool mouse_bounding_enabled = false;
 constexpr bool mouse_drawing_enabled = true;
 
@@ -32,8 +35,6 @@ constexpr float		relative_scale = 1.0f;
 static float mouse_draw_radius = 30.0f;
 
 static char title[64];
-
-constexpr uint64_t	instance_count = (1 << 10);
 
 #define Log(str) std::cout << str << std::endl
 

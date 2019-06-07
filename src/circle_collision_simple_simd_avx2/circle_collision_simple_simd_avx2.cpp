@@ -21,7 +21,6 @@
 // SIMD Constants
 #define SIMD
 
-constexpr	size_t	twos = (instance_count * (instance_count - 1)) / 2;
 constexpr	size_t	left = (twos % 8);
 constexpr	size_t	n = twos - left;
 static		__m256i base = _mm256_setr_epi32(0, 1, 2, 3, 4, 5, 6, 7);
@@ -76,8 +75,6 @@ static std::vector<char> read_file(const std::string& fileName)
 
 void CircleCollisionSIMD::initialize()
 {
-	this->cols.resize(twos * sizeof(size_t));
-
 	srand(time(NULL));
 	validation_layers_enabled = false;
 	char current_path[FILENAME_MAX];
@@ -672,8 +669,8 @@ bool CircleCollisionSIMD::create_descriptor_set_layout()
 
 bool CircleCollisionSIMD::create_graphics_pipeline()
 {
-	auto vert_shader = read_file(this->app_path + "\\..\\..\\..\\src\\circle_collision_simple\\shaders\\shaders.vert.spv");
-	auto frag_shader = read_file(this->app_path + "\\..\\..\\..\\src\\circle_collision_simple\\shaders\\shaders.frag.spv");
+	auto vert_shader = read_file(this->app_path + "\\..\\..\\..\\src\\circle_collision_simple_simd_avx2\\shaders\\shaders.vert.spv");
+	auto frag_shader = read_file(this->app_path + "\\..\\..\\..\\src\\circle_collision_simple_simd_avx2\\shaders\\shaders.frag.spv");
 
 	if (vert_shader.empty() || frag_shader.empty())
 	{
@@ -1345,8 +1342,10 @@ void CircleCollisionSIMD::update(const uint32_t& current_image)
 	size_t column = 1;
 
 	size_t collisions = 0;
+	
+	std::vector<std::pair<size_t, size_t>> collided;
 
-#if defined(SIMD)
+#if !defined(SIMD)
 	for (size_t k = 0; k < n / 8; ++k)
 	{
 		for (short i = 0; i < 8; ++i)
@@ -1439,8 +1438,7 @@ void CircleCollisionSIMD::update(const uint32_t& current_image)
 		{
 			if (resultf[m] == 0)
 			{
-				this->cols[collisions * 2] = checks[m * 2];
-				this->cols[collisions * 2 + 1] = checks[m * 2 + 1];
+				collided.push_back(std::pair<size_t, size_t>(checks[m * 2], checks[m * 2 + 1]));
 				collisions++;
 			}
 		}
@@ -1458,8 +1456,7 @@ void CircleCollisionSIMD::update(const uint32_t& current_image)
 
 			if (dis2 < radii * radii)
 			{
-				this->cols[collisions * 2] = i;
-				this->cols[collisions * 2 + 1] = j;
+				collided.push_back(std::pair<size_t, size_t>(i, j));
 				collisions++;
 			}
 		}
@@ -1469,10 +1466,10 @@ void CircleCollisionSIMD::update(const uint32_t& current_image)
 	const auto t2 = std::chrono::high_resolution_clock::now();
 
 	// Takes Less than 0.1 (ms) Not Worth Optimizing Now
-	for (size_t k = 0; k < collisions; k += 2)
+	for (size_t k = 0; k < collided.size(); ++k)
 	{
-		int i = this->cols[k];
-		int j = this->cols[k + 1];
+		int i = collided[k].first;
+		int j = collided[k].second;
 
 		const auto dx = this->circles.x_positions[i] - this->circles.x_positions[j];
 		const auto dy = this->circles.y_positions[i] - this->circles.y_positions[j];

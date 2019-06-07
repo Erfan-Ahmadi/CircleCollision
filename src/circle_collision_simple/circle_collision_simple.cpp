@@ -64,8 +64,6 @@ static std::vector<char> read_file(const std::string& fileName)
 
 void CircleCollisionSimple::initialize()
 {
-	this->cols.resize((instance_count * (instance_count - 1) / 2) * sizeof(size_t));
-
 	srand(time(NULL));
 	validation_layers_enabled = false;
 	char current_path[FILENAME_MAX];
@@ -1273,9 +1271,6 @@ void CircleCollisionSimple::update(const uint32_t& current_image)
 	const auto right_wall = (mouse_bounding_enabled && draw) ? mouse_pos.x : INIT_WIDTH;
 	const auto bottom_wall = (mouse_bounding_enabled && draw) ? mouse_pos.y : INIT_HEIGHT;
 
-	//ZeroMemory(this->firsts, sizeof(size_t) * instance_count);
-	//ZeroMemory(this->seconds, sizeof(size_t) * instance_count);
-
 	for (size_t i = 0; i < instance_count; ++i)
 	{
 		if (draw && glm::distance(this->circles.positions[i], mouse_pos) < mouse_draw_radius)
@@ -1286,7 +1281,7 @@ void CircleCollisionSimple::update(const uint32_t& current_image)
 		this->circles.positions[i] += this->circles.velocities[i] * this->frame_timer;
 	}
 
-	size_t collisions = 0;
+	std::vector<std::pair<size_t, size_t>> collided;
 
 	for (size_t i = 0; i < instance_count; ++i)
 	{
@@ -1321,17 +1316,15 @@ void CircleCollisionSimple::update(const uint32_t& current_image)
 
 			if (dis2 < radii * radii)
 			{
-				this->cols[collisions * 2] = i;
-				this->cols[collisions * 2 + 1] = j;
-				collisions++;
+				collided.push_back(std::pair<size_t, size_t>(i, j));
 			}
 		}
 	}
 
-	for (size_t k = 0; k < collisions; k += 2)
+	for (size_t k = 0; k < collided.size(); ++k)
 	{
-		int i = this->cols[k];
-		int j = this->cols[k + 1];
+		int i = collided[k].first;
+		int j = collided[k].second;
 
 		const auto dx = this->circles.positions[i].x - this->circles.positions[j].x;
 		const auto dy = this->circles.positions[i].y - this->circles.positions[j].y;

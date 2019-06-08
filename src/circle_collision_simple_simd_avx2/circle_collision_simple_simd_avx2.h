@@ -5,19 +5,28 @@
 
 struct circles_strcut
 {
-	std::vector<float> x_positions;
-	std::vector<float> y_positions;
-	std::vector<glm::vec2> velocities;
-	std::vector<glm::vec3> colors;
-	std::vector<float> scales; // = radius
+	float*		x_positions;
+	float*		y_positions;
+	glm::vec2*	velocities;
+	glm::vec3*	colors;
+	float*		scales;
 
 	inline void resize(const size_t& size)
 	{
-		x_positions.resize(size);
-		y_positions.resize(size);
-		velocities.resize(size);
-		colors.resize(size);
-		scales.resize(size);
+		x_positions = static_cast<float*>(_aligned_malloc(sizeof(float) * size, alignof(float)));
+		y_positions = static_cast<float*>(_aligned_malloc(sizeof(float) * size, alignof(float)));
+		velocities	= static_cast<glm::vec2*>(malloc(sizeof(glm::vec2) * size));
+		colors		= static_cast<glm::vec3*>(malloc(sizeof(glm::vec3) * size));
+		scales		= static_cast<float*>(_aligned_malloc(sizeof(float) * size, alignof(float)));
+	}
+
+	void release()
+	{
+		_aligned_free(x_positions);
+		_aligned_free(y_positions);
+		free(velocities);
+		free(colors);
+		_aligned_free(scales);
 	}
 };
  

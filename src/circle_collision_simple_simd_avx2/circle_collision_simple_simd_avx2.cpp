@@ -19,7 +19,7 @@
 #include <immintrin.h>
 
 // SIMD Constants
-#define SIMD
+#define NOSIMD
 
 constexpr	size_t	left = (twos % 8);
 constexpr	size_t	n = twos - left;
@@ -1500,11 +1500,11 @@ void CircleCollisionSIMD::update(const uint32_t& current_image)
 
 	static const auto positions_update_size = sizeof(float) * instance_count;
 	vkMapMemory(this->device, this->x_positions_buffer_memory, 0, positions_update_size, 0, &data);
-	memcpy(data, this->circles.x_positions.data(), positions_update_size);
+	memcpy(data, this->circles.x_positions, positions_update_size);
 	vkUnmapMemory(this->device, this->x_positions_buffer_memory);
 	
 	vkMapMemory(this->device, this->y_positions_buffer_memory, 0, positions_update_size, 0, &data);
-	memcpy(data, this->circles.y_positions.data(), positions_update_size);
+	memcpy(data, this->circles.y_positions, positions_update_size);
 	vkUnmapMemory(this->device, this->y_positions_buffer_memory);
 
 	UniformBufferObject ubo = {};
@@ -1658,6 +1658,8 @@ bool CircleCollisionSIMD::release()
 	if (is_released)
 		return true;
 
+	circles.release();
+
 	vkDeviceWaitIdle(this->device);
 
 #if defined (_DEBUG)
@@ -1747,7 +1749,7 @@ bool CircleCollisionSIMD::create_colors_buffer()
 
 	void* data = nullptr;
 	vkMapMemory(this->device, this->colors_buffer_memory, 0, buffer_size, 0, &data);
-	memcpy(data, this->circles.colors.data(), buffer_size);
+	memcpy(data, this->circles.colors, buffer_size);
 	vkUnmapMemory(this->device, this->colors_buffer_memory);
 
 	return true;
@@ -1771,7 +1773,7 @@ bool CircleCollisionSIMD::create_positions_buffer()
 
 	void* data = nullptr;
 	vkMapMemory(this->device, this->x_positions_buffer_memory, 0, buffer_size, 0, &data);
-	memcpy(data, this->circles.x_positions.data(), buffer_size);
+	memcpy(data, this->circles.x_positions, buffer_size);
 	vkUnmapMemory(this->device, this->x_positions_buffer_memory);
 	
 	if (!helper::create_buffer(
@@ -1787,7 +1789,7 @@ bool CircleCollisionSIMD::create_positions_buffer()
 	}
 
 	vkMapMemory(this->device, this->y_positions_buffer_memory, 0, buffer_size, 0, &data);
-	memcpy(data, this->circles.y_positions.data(), buffer_size);
+	memcpy(data, this->circles.y_positions, buffer_size);
 	vkUnmapMemory(this->device, this->y_positions_buffer_memory);
 
 	return true;
@@ -1814,7 +1816,7 @@ bool CircleCollisionSIMD::create_scales_buffer()
 
 	void* data = nullptr;
 	vkMapMemory(this->device, staging_buffer_memory, 0, buffer_size, 0, &data);
-	memcpy(data, this->circles.scales.data(), buffer_size);
+	memcpy(data, this->circles.scales, buffer_size);
 	vkUnmapMemory(this->device, staging_buffer_memory);
 
 	if (!helper::create_buffer(

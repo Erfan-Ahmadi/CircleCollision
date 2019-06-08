@@ -16,9 +16,6 @@ Implementing Different Methods of Circle to Circle Collision Detection using Vul
  <img src="https://raw.githubusercontent.com/Erfan-Ahmadi/circle_collision/master/docs/Collision-detection-pipeline.png" width="372" height="85"/>
  </p>
 
-**This is not a benchmark!, Although It would give me some ideas and thing to be suspicious about.
-And also I would appreciate optimization ideas and results on your system.**
-
 # Images and Preview
 
 <p align="center">
@@ -71,8 +68,7 @@ This Project Is For Learning Purposes of Following Topics
 
 # Build
 - **MSVC14** 
-
-CMAKE and Linux Builds Will be Added Soon
+- :soon: **Linux** Builds Will be Added Soon
 
 # Blog 
 You can here about implementation details soon in my blog, [GraphicsCoder](https://graphicscoder.com)
@@ -93,3 +89,9 @@ You can here about implementation details soon in my blog, [GraphicsCoder](https
 - Circle Collision Handling
   - [Circle-Circle Collision Tutorial (Math)](https://ericleong.me/research/circle-circle/)
   - [Programming Balls #1 Circle Vs Circle Collisions C++ (Fun Video)](https://www.youtube.com/watch?v=LPzyNOHY3A4s)
+  
+  
+:heavy_exclamation_mark: This project is not for benchmarking purposes!, Although It would give me some ideas to be suspicious about.
+
+:heart_decoration: I would appreciate optimization ideas and results on your system on [issues](https://github.com/Erfan-Ahmadi/CircleCollision/issues).
+

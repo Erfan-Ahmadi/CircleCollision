@@ -1,10 +1,10 @@
 <p align="center">
-<img src="https://raw.githubusercontent.com/Erfan-Ahmadi/circle_collision/master/docs/LOGO.png" align="center" alt="" width="360" height="34"/>
+<img src="https://raw.githubusercontent.com/Erfan-Ahmadi/circle_collision/master/docs/LOGO.png" align="center" alt="" height="200"/>
 </p>
 
 <p align="center">
-<img src="https://www.khronos.org/assets/uploads/apis/vulkan2.svg" align="center" alt="" height="70" hspace="20"/>
-<img src="https://upload.wikimedia.org/wikipedia/commons/c/c9/Intel-logo.svg" align="center" alt="" height="70" hspace="20"/>
+<img src="https://www.khronos.org/assets/uploads/apis/vulkan2.svg" align="center" alt="" height="40" hspace="20"/>
+<img src="https://upload.wikimedia.org/wikipedia/commons/c/c9/Intel-logo.svg" align="center" alt="" height="40" hspace="20"/>
 </p>
 
 # Circle Collision

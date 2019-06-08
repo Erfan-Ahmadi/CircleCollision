@@ -77,8 +77,15 @@ You can here about implementation details soon in my blog, [GraphicsCoder](https
 [Presentation Slides](https://docs.google.com/presentation/d/1qI02vD9Wr6rhxHnOlLWc8WHF7K7XYQr85-vk4y1C0ro/edit?usp=sharing)  
 
 # Resources
-- [Game Programming Patterns Book/Spatial Partitioning](https://gameprogrammingpatterns.com/spatial-partition.html)
-- [Circle-Circle Collision Tutorial (Math)](https://ericleong.me/research/circle-circle/)
-- [Programming Balls #1 Circle Vs Circle Collisions C++ (Fun Video)](https://www.youtube.com/watch?v=LPzyNOHY3A4s)
-- [A Simple Vulkan Compute Example](http://www.duskborn.com/posts/a-simple-vulkan-compute-example/)
-- [Thinking Parallel, Part I: Collision Detection on the GPU](https://devblogs.nvidia.com/thinking-parallel-part-i-collision-detection-gpu/)
+- SIMD
+  - [SIMD at Insomniac Games](https://www.gdcvault.com/play/1022248/SIMD-at-Insomniac-Games-How)
+  - [Crunching Numbers with AVX and AVX2](https://www.codeproject.com/Articles/874396/Crunching-Numbers-with-AVX-and-AVX)
+  - [Intel Intrinsics Guide](https://software.intel.com/sites/landingpage/IntrinsicsGuide/#techs=AVX2)
+- Spatial Partitioning
+  - [Game Programming Patterns Book/Spatial Partitioning](https://gameprogrammingpatterns.com/spatial-partition.html)
+- Vulkan and GPU Programming
+  - [A Simple Vulkan Compute Example](http://www.duskborn.com/posts/a-simple-vulkan-compute-example/)
+  - [Thinking Parallel, Part I: Collision Detection on the GPU](https://devblogs.nvidia.com/thinking-parallel-part-i-collision-detection-gpu/)
+- Circle Collision Handling
+  - [Circle-Circle Collision Tutorial (Math)](https://ericleong.me/research/circle-circle/)
+  - [Programming Balls #1 Circle Vs Circle Collisions C++ (Fun Video)](https://www.youtube.com/watch?v=LPzyNOHY3A4s)

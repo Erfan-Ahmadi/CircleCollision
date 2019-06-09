@@ -25,7 +25,7 @@ typedef uint32_t size;
 constexpr int screen_width = 1280;
 constexpr int screen_height = 720;
 
-constexpr size		instance_count = (1 << 13);
+constexpr size		instance_count = (1 << 8);
 constexpr float		relative_velocity = 0.1f;
 constexpr float		relative_scale = 1.0f;
 

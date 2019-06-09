@@ -1293,17 +1293,18 @@ void CircleCollisionSIMD::update(const uint32_t& current_image)
 	const auto right_wall = (mouse_bounding_enabled && draw) ? mouse_pos.x : screen_width;
 	const auto bottom_wall = (mouse_bounding_enabled && draw) ? mouse_pos.y : screen_height;
 
-	for (size_t i = 0; i < instance_count; ++i)
+	const __m256 frame_time_vec = _mm256_set1_ps(this->frame_timer);
+	for (size_t i = 0; i < vectors_size; ++i)
 	{
-		//if (draw && glm::distance(this->circles.positions[i], mouse_pos) < mouse_draw_radius)
-		//{
-		//	this->circles.velocities[i] = -1.0f * (mouse_pos - this->circles.positions[i]) * 10e-3f;
-		//}
-
-		this->circles.x_positions[i] += this->circles.velocities[i].x * this->frame_timer;
-		this->circles.y_positions[i] += this->circles.velocities[i].y * this->frame_timer;
+		this->circles.x_positions[i] = _mm256_add_ps(
+			this->circles.x_positions[i],
+			_mm256_mul_ps(this->circles.x_velocities[i], frame_time_vec));
+		this->circles.y_positions[i] = _mm256_add_ps(
+			this->circles.y_positions[i],
+			_mm256_mul_ps(this->circles.y_velocities[i], frame_time_vec));
 	}
 
+/*
 	// Handle Walls
 	for (size_t i = 0; i < instance_count; ++i)
 	{
@@ -1388,7 +1389,6 @@ void CircleCollisionSIMD::update(const uint32_t& current_image)
 	}
 
 	const auto t2 = std::chrono::high_resolution_clock::now();
-
 	// Takes Less than 0.1 (ms) Not Worth Optimizing Now
 	for (size k = 0; k < collided.size(); ++k)
 	{
@@ -1416,12 +1416,12 @@ void CircleCollisionSIMD::update(const uint32_t& current_image)
 		this->circles.velocities[i] = (this->circles.velocities[i] - n * m2 * p);
 		this->circles.velocities[j] = (this->circles.velocities[j] + n * m1 * p);
 	}
-
 	const auto t3 = std::chrono::high_resolution_clock::now();
 	const auto detection = std::chrono::duration<double, std::milli>(t2 - t1).count();
 	const auto handle = std::chrono::duration<double, std::milli>(t3 - t2).count();
 
 	sprintf_s(title, "Detection: %.8f (ms) - Handle: %.8f (ms)", detection, handle);
+*/
 
 	if (draw)
 		draw = false;
@@ -1767,16 +1767,71 @@ bool CircleCollisionSIMD::create_scales_buffer()
 	return true;
 }
 
+inline float rand_vel(const float& scale)
+{
+	return relative_velocity * (((rand() % 100) / 200.0f) * ((rand() % 2) * 2 - 1.0f)) / glm::sqrt(scale) * 3.0f;
+}
+
+inline float rand_pos(const float& scale, const int& max)
+{
+	return scale + rand() % (max - 2 * static_cast<int>(scale));
+}
+
+
 void CircleCollisionSIMD::setup_circles()
 {
-	this->circles.resize(instance_count);
+	this->circles.resize();
 
 	for (size_t i = 0; i < instance_count; ++i)
 	{
 		this->circles.scales[i] = min_size + (rand() % (max_size - min_size));
-		this->circles.velocities[i] = relative_velocity * glm::vec2(((rand() % 100) / 200.0f) * ((rand() % 2) * 2 - 1.0f), (rand() % 100) / 200.0f * ((rand() % 2) * 2 - 1.0f)) / glm::sqrt(this->circles.scales[i]) * 3.0f;
-		this->circles.x_positions[i] = this->circles.scales[i] + rand() % (screen_width - 2 * static_cast<int>(this->circles.scales[i]));
-		this->circles.y_positions[i] = this->circles.scales[i] + rand() % (screen_height - 2 * static_cast<int>(this->circles.scales[i]));
 		this->circles.colors[i] = glm::vec3((rand() % 255) / 255.0f, (rand() % 255) / 255.0f, (rand() % 255) / 255.0f);
+	}
+		
+	for (size_t i = 0; i < vectors_size; ++i)
+	{
+		this->circles.x_velocities[i] = _mm256_setr_ps(
+			rand_vel(this->circles.scales[i + 0]),
+			rand_vel(this->circles.scales[i + 1]),
+			rand_vel(this->circles.scales[i + 2]),
+			rand_vel(this->circles.scales[i + 3]),
+			rand_vel(this->circles.scales[i + 4]),
+			rand_vel(this->circles.scales[i + 5]),
+			rand_vel(this->circles.scales[i + 6]),
+			rand_vel(this->circles.scales[i + 7])
+		);
+		
+		this->circles.y_velocities[i] = _mm256_setr_ps(
+			rand_vel(this->circles.scales[i + 0]),
+			rand_vel(this->circles.scales[i + 1]),
+			rand_vel(this->circles.scales[i + 2]),
+			rand_vel(this->circles.scales[i + 3]),
+			rand_vel(this->circles.scales[i + 4]),
+			rand_vel(this->circles.scales[i + 5]),
+			rand_vel(this->circles.scales[i + 6]),
+			rand_vel(this->circles.scales[i + 7])
+		);
+		
+		this->circles.x_positions[i] = _mm256_setr_ps(
+			rand_pos(this->circles.scales[i + 0], screen_width),
+			rand_pos(this->circles.scales[i + 1], screen_width),
+			rand_pos(this->circles.scales[i + 2], screen_width),
+			rand_pos(this->circles.scales[i + 3], screen_width),
+			rand_pos(this->circles.scales[i + 4], screen_width),
+			rand_pos(this->circles.scales[i + 5], screen_width),
+			rand_pos(this->circles.scales[i + 6], screen_width),
+			rand_pos(this->circles.scales[i + 7], screen_width)
+		);
+		
+		this->circles.y_positions[i] = _mm256_setr_ps(
+			rand_pos(this->circles.scales[i + 0], screen_height),
+			rand_pos(this->circles.scales[i + 1], screen_height),
+			rand_pos(this->circles.scales[i + 2], screen_height),
+			rand_pos(this->circles.scales[i + 3], screen_height),
+			rand_pos(this->circles.scales[i + 4], screen_height),
+			rand_pos(this->circles.scales[i + 5], screen_height),
+			rand_pos(this->circles.scales[i + 6], screen_height),
+			rand_pos(this->circles.scales[i + 7], screen_height)
+		);
 	}
 }

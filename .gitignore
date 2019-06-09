@@ -331,3 +331,4 @@ ASALocalRun/
 *.filters
 *.infoadvixe
 *.dflgadvixe
+/build/Visual Studio 2019/GPUCache

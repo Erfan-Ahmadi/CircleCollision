@@ -1,4 +1,4 @@
-#include "circle_collision_simple_simd_avx2.h"
+#include "simple_simd_avx2.h"
 
 int main()
 {

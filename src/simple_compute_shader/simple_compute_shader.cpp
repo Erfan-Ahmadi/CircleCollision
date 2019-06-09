@@ -1,4 +1,4 @@
-#include "circle_collision_compute_shader.h"
+#include "simple_compute_shader.h"
 
 #include <set>
 #include <fstream>
@@ -663,8 +663,8 @@ bool CircleCollisionComputeShader::create_descriptor_set_layout()
 
 bool CircleCollisionComputeShader::create_graphics_pipeline()
 {
-	auto vert_shader = read_file(this->app_path + "\\..\\..\\..\\src\\circle_collision_compute_shader\\shaders\\shaders.vert.spv");
-	auto frag_shader = read_file(this->app_path + "\\..\\..\\..\\src\\circle_collision_compute_shader\\shaders\\shaders.frag.spv");
+	auto vert_shader = read_file(this->app_path + "\\..\\..\\..\\src\\simple_compute_shader\\shaders\\shaders.vert.spv");
+	auto frag_shader = read_file(this->app_path + "\\..\\..\\..\\src\\simple_compute_shader\\shaders\\shaders.frag.spv");
 
 	if (vert_shader.empty() || frag_shader.empty())
 	{
@@ -1537,7 +1537,7 @@ bool CircleCollisionComputeShader::prepare_compute()
 	// Create Pipeline
 
 	// Load Compute Shader
-	auto comp_shader = read_file(this->app_path + "\\..\\..\\..\\src\\circle_collision_compute_shader\\shaders\\shaders.comp.spv");
+	auto comp_shader = read_file(this->app_path + "\\..\\..\\..\\src\\simple_compute_shader\\shaders\\shaders.comp.spv");
 	VkShaderModule comp_shader_module = helper::create_shader_module(this->device, comp_shader);
 
 	VkPipelineShaderStageCreateInfo compute_shader = {};

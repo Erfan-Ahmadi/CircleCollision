@@ -1,4 +1,4 @@
-#include "circle_collision_simple.h"
+#include "simple_cpu.h"
 
 #include <set>
 #include <fstream>
@@ -658,8 +658,8 @@ bool CircleCollisionSimple::create_descriptor_set_layout()
 
 bool CircleCollisionSimple::create_graphics_pipeline()
 {
-	auto vert_shader = read_file(this->app_path + "\\..\\..\\..\\src\\circle_collision_simple\\shaders\\shaders.vert.spv");
-	auto frag_shader = read_file(this->app_path + "\\..\\..\\..\\src\\circle_collision_simple\\shaders\\shaders.frag.spv");
+	auto vert_shader = read_file(this->app_path + "\\..\\..\\..\\src\\simple_cpu\\shaders\\shaders.vert.spv");
+	auto frag_shader = read_file(this->app_path + "\\..\\..\\..\\src\\simple_cpu\\shaders\\shaders.frag.spv");
 
 	if (vert_shader.empty() || frag_shader.empty())
 	{

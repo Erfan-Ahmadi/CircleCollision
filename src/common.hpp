@@ -16,7 +16,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-#include "vulkan_initializers.hpp"
+#include "Renderer/vulkan_initializers.hpp"
 
 #include <vulkan/vulkan.h>
 

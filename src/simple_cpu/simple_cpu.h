@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Renderer/common.hpp"
+#include "../common.hpp"
 #include <chrono>
 
 struct circles_strcut

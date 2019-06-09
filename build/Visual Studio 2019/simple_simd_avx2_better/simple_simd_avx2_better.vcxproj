@@ -18,12 +18,24 @@
       <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\..\src\helper.cpp" />
+    <ClCompile Include="..\..\..\src\simple_simd_avx2_better\main.cpp" />
+    <ClCompile Include="..\..\..\src\simple_simd_avx2_better\simple_simd_avx2_better.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\src\common.hpp" />
+    <ClInclude Include="..\..\..\src\simple_simd_avx2_better\simple_simd_avx2_better.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\..\src\simple_simd_avx2_better\shaders\shaders.frag" />
+    <None Include="..\..\..\src\simple_simd_avx2_better\shaders\shaders.vert" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
-    <ProjectGuid>{3C30986F-0604-455D-B5C4-B7F00EA88BB2}</ProjectGuid>
-    <RootNamespace>circlecollisioncomputeshader</RootNamespace>
+    <ProjectGuid>{915A1748-BCA3-45ED-A51A-39870A9EA54B}</ProjectGuid>
+    <RootNamespace>simplesimdavx2better</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
-    <ProjectName>simple_compute_shader</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -81,6 +93,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
+      <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -125,21 +138,6 @@
       <OptimizeReferences>true</OptimizeReferences>
     </Link>
   </ItemDefinitionGroup>
-  <ItemGroup>
-    <ClInclude Include="..\..\..\src\circle_collision_compute_shader\circle_collision_compute_shader.h" />
-    <ClInclude Include="..\..\..\src\Renderer\common.hpp" />
-    <ClInclude Include="..\..\..\src\Renderer\vulkan_initializers.hpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="..\..\..\src\circle_collision_compute_shader\circle_collision_compute_shader.cpp" />
-    <ClCompile Include="..\..\..\src\circle_collision_compute_shader\main.cpp" />
-    <ClCompile Include="..\..\..\src\Renderer\helper.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="..\..\..\src\circle_collision_compute_shader\shaders\shaders.comp" />
-    <None Include="..\..\..\src\circle_collision_compute_shader\shaders\shaders.frag" />
-    <None Include="..\..\..\src\circle_collision_compute_shader\shaders\shaders.vert" />
-  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

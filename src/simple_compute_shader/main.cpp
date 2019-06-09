@@ -1,8 +1,8 @@
-#include "circle_collision_simple.h"
+#include "simple_compute_shader.h"
 
 int main()
 {
-	CircleCollisionSimple app;
+	CircleCollisionComputeShader app;
 
 	app.initialize();
 

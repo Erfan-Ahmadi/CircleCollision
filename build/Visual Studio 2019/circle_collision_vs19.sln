@@ -3,11 +3,13 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.28922.388
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "simple", "circle_collision_simple\circle_collision_simple.vcxproj", "{40FD6623-F659-45ED-9ED5-AD2119795132}"
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "simple_compute_shader", "circle_collision_compute_shader\circle_collision_compute_shader.vcxproj", "{3C30986F-0604-455D-B5C4-B7F00EA88BB2}"
-EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "simple_simd_avx2", "simple_simd_avx2\simple_simd_avx2.vcxproj", "{8D619BFF-3FC6-4DD8-BDF6-5AC19A1837A7}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "simple_simd_avx2_better", "simple_simd_avx2_better\simple_simd_avx2_better.vcxproj", "{915A1748-BCA3-45ED-A51A-39870A9EA54B}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "simple_cpu", "simple_cpu\circle_collision_simple.vcxproj", "{40FD6623-F659-45ED-9ED5-AD2119795132}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "simple_compute_shader", "simple_compute_shader\simple_compute_shader.vcxproj", "{3C30986F-0604-455D-B5C4-B7F00EA88BB2}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -17,6 +19,22 @@ Global
 		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{8D619BFF-3FC6-4DD8-BDF6-5AC19A1837A7}.Debug|x64.ActiveCfg = Debug|x64
+		{8D619BFF-3FC6-4DD8-BDF6-5AC19A1837A7}.Debug|x64.Build.0 = Debug|x64
+		{8D619BFF-3FC6-4DD8-BDF6-5AC19A1837A7}.Debug|x86.ActiveCfg = Debug|Win32
+		{8D619BFF-3FC6-4DD8-BDF6-5AC19A1837A7}.Debug|x86.Build.0 = Debug|Win32
+		{8D619BFF-3FC6-4DD8-BDF6-5AC19A1837A7}.Release|x64.ActiveCfg = Release|x64
+		{8D619BFF-3FC6-4DD8-BDF6-5AC19A1837A7}.Release|x64.Build.0 = Release|x64
+		{8D619BFF-3FC6-4DD8-BDF6-5AC19A1837A7}.Release|x86.ActiveCfg = Release|Win32
+		{8D619BFF-3FC6-4DD8-BDF6-5AC19A1837A7}.Release|x86.Build.0 = Release|Win32
+		{915A1748-BCA3-45ED-A51A-39870A9EA54B}.Debug|x64.ActiveCfg = Debug|x64
+		{915A1748-BCA3-45ED-A51A-39870A9EA54B}.Debug|x64.Build.0 = Debug|x64
+		{915A1748-BCA3-45ED-A51A-39870A9EA54B}.Debug|x86.ActiveCfg = Debug|Win32
+		{915A1748-BCA3-45ED-A51A-39870A9EA54B}.Debug|x86.Build.0 = Debug|Win32
+		{915A1748-BCA3-45ED-A51A-39870A9EA54B}.Release|x64.ActiveCfg = Release|x64
+		{915A1748-BCA3-45ED-A51A-39870A9EA54B}.Release|x64.Build.0 = Release|x64
+		{915A1748-BCA3-45ED-A51A-39870A9EA54B}.Release|x86.ActiveCfg = Release|Win32
+		{915A1748-BCA3-45ED-A51A-39870A9EA54B}.Release|x86.Build.0 = Release|Win32
 		{40FD6623-F659-45ED-9ED5-AD2119795132}.Debug|x64.ActiveCfg = Debug|x64
 		{40FD6623-F659-45ED-9ED5-AD2119795132}.Debug|x64.Build.0 = Debug|x64
 		{40FD6623-F659-45ED-9ED5-AD2119795132}.Debug|x86.ActiveCfg = Debug|Win32
@@ -33,14 +51,6 @@ Global
 		{3C30986F-0604-455D-B5C4-B7F00EA88BB2}.Release|x64.Build.0 = Release|x64
 		{3C30986F-0604-455D-B5C4-B7F00EA88BB2}.Release|x86.ActiveCfg = Release|Win32
 		{3C30986F-0604-455D-B5C4-B7F00EA88BB2}.Release|x86.Build.0 = Release|Win32
-		{8D619BFF-3FC6-4DD8-BDF6-5AC19A1837A7}.Debug|x64.ActiveCfg = Debug|x64
-		{8D619BFF-3FC6-4DD8-BDF6-5AC19A1837A7}.Debug|x64.Build.0 = Debug|x64
-		{8D619BFF-3FC6-4DD8-BDF6-5AC19A1837A7}.Debug|x86.ActiveCfg = Debug|Win32
-		{8D619BFF-3FC6-4DD8-BDF6-5AC19A1837A7}.Debug|x86.Build.0 = Debug|Win32
-		{8D619BFF-3FC6-4DD8-BDF6-5AC19A1837A7}.Release|x64.ActiveCfg = Release|x64
-		{8D619BFF-3FC6-4DD8-BDF6-5AC19A1837A7}.Release|x64.Build.0 = Release|x64
-		{8D619BFF-3FC6-4DD8-BDF6-5AC19A1837A7}.Release|x86.ActiveCfg = Release|Win32
-		{8D619BFF-3FC6-4DD8-BDF6-5AC19A1837A7}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -1,4 +1,4 @@
-#include "circle_collision_simple_simd_avx2.h"
+#include "simple_simd_avx2.h"
 
 #include <set>
 #include <fstream>
@@ -664,8 +664,8 @@ bool CircleCollisionSIMD::create_descriptor_set_layout()
 
 bool CircleCollisionSIMD::create_graphics_pipeline()
 {
-	auto vert_shader = read_file(this->app_path + "\\..\\..\\..\\src\\circle_collision_simple_simd_avx2\\shaders\\shaders.vert.spv");
-	auto frag_shader = read_file(this->app_path + "\\..\\..\\..\\src\\circle_collision_simple_simd_avx2\\shaders\\shaders.frag.spv");
+	auto vert_shader = read_file(this->app_path + "\\..\\..\\..\\src\\simple_simd_avx2\\shaders\\shaders.vert.spv");
+	auto frag_shader = read_file(this->app_path + "\\..\\..\\..\\src\\simple_simd_avx2\\shaders\\shaders.frag.spv");
 
 	if (vert_shader.empty() || frag_shader.empty())
 	{

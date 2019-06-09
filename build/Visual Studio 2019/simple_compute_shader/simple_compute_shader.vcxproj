@@ -20,10 +20,10 @@
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
-    <ProjectGuid>{8D619BFF-3FC6-4DD8-BDF6-5AC19A1837A7}</ProjectGuid>
-    <RootNamespace>simplesimdavx2</RootNamespace>
+    <ProjectGuid>{3C30986F-0604-455D-B5C4-B7F00EA88BB2}</ProjectGuid>
+    <RootNamespace>circlecollisioncomputeshader</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
-    <ProjectName>simple_simd_avx2</ProjectName>
+    <ProjectName>simple_compute_shader</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -81,8 +81,6 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
-      <AssemblerOutput>AssemblyAndSourceCode</AssemblerOutput>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -107,7 +105,6 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -131,16 +128,17 @@
   <ItemGroup>
     <ClInclude Include="..\..\..\src\common.hpp" />
     <ClInclude Include="..\..\..\src\Renderer\vulkan_initializers.hpp" />
-    <ClInclude Include="..\..\..\src\simple_simd_avx2\simple_simd_avx2.h" />
+    <ClInclude Include="..\..\..\src\simple_compute_shader\simple_compute_shader.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\helper.cpp" />
-    <ClCompile Include="..\..\..\src\simple_simd_avx2\main.cpp" />
-    <ClCompile Include="..\..\..\src\simple_simd_avx2\simple_simd_avx2.cpp" />
+    <ClCompile Include="..\..\..\src\simple_compute_shader\main.cpp" />
+    <ClCompile Include="..\..\..\src\simple_compute_shader\simple_compute_shader.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\..\src\simple_simd_avx2\shaders\shaders.frag" />
-    <None Include="..\..\..\src\simple_simd_avx2\shaders\shaders.vert" />
+    <None Include="..\..\..\src\simple_compute_shader\shaders\shaders.comp" />
+    <None Include="..\..\..\src\simple_compute_shader\shaders\shaders.frag" />
+    <None Include="..\..\..\src\simple_compute_shader\shaders\shaders.vert" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

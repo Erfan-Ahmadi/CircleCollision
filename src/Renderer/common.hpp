@@ -20,23 +20,27 @@
 
 #include <vulkan/vulkan.h>
 
-constexpr int INIT_WIDTH = 1280;
-constexpr int INIT_HEIGHT = 720;
+typedef uint32_t size;
 
-constexpr uint64_t	instance_count = (1 << 10);
-constexpr size_t twos = (instance_count * (instance_count - 1) / 2);
+constexpr int screen_width = 1280;
+constexpr int screen_height = 720;
+
+constexpr size		instance_count = (1 << 13);
+constexpr float		relative_velocity = 0.1f;
+constexpr float		relative_scale = 1.0f;
 
 constexpr bool mouse_bounding_enabled = false;
 constexpr bool mouse_drawing_enabled = true;
 
-constexpr float		relative_velocity = 0.1f;
-constexpr float		relative_scale = 1.0f;
-
 static float mouse_draw_radius = 30.0f;
+
+static int max_size = relative_scale * glm::sqrt((screen_width * screen_height) / instance_count) * 0.5f;
+static int min_size = max_size / 3;
+static const int max_collisions = max_size / 2;
 
 static char title[64];
 
-#define Log(str) std::cout << str << std::endl
+#define log(str) std::cout << str << std::endl
 
 static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
 	VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,

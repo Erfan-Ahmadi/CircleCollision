@@ -94,7 +94,7 @@ bool CircleCollisionComputeShader::setup_window()
 
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-	this->window = glfwCreateWindow(INIT_WIDTH, INIT_HEIGHT, "Vulkan-Learn-1", nullptr, nullptr);
+	this->window = glfwCreateWindow(screen_width, screen_height, "Vulkan-Learn-1", nullptr, nullptr);
 	glfwSetScrollCallback(window, scroll_callback);
 	glfwSetFramebufferSizeCallback(this->window, resize_callback);
 	glfwSetWindowPos(this->window, 0, 50);
@@ -210,10 +210,10 @@ bool CircleCollisionComputeShader::create_instance()
 	std::vector<VkExtensionProperties> available_extensions(available_extention_count);
 	vkEnumerateInstanceExtensionProperties(nullptr, &available_extention_count, available_extensions.data());
 
-	Log("available extensions" << "(" << available_extention_count << ") : ");
+	log("available extensions" << "(" << available_extention_count << ") : ");
 
 	for (const auto& extension : available_extensions) {
-		Log("\t" << extension.extensionName);
+		log("\t" << extension.extensionName);
 	}
 
 	// Ok Let's Do It :(
@@ -230,7 +230,7 @@ bool CircleCollisionComputeShader::create_instance()
 	// check if extentions required is available
 	if (glfw_extensions_count > available_extention_count)
 	{
-		Log("Extentions for glfw are not available");
+		log("Extentions for glfw are not available");
 		return false;
 	}
 
@@ -246,7 +246,7 @@ bool CircleCollisionComputeShader::create_instance()
 
 		if (!found_extention)
 		{
-			Log("Extention << " << glfw_extensions[i] << " >> for glfw is not available");
+			log("Extention << " << glfw_extensions[i] << " >> for glfw is not available");
 			return false;
 		}
 	}
@@ -318,7 +318,7 @@ bool CircleCollisionComputeShader::pick_physical_device()
 
 	if (available_physical_devices_count == 0)
 	{
-		Log("No Supported Vulkan GPU found.");
+		log("No Supported Vulkan GPU found.");
 		return false;
 	}
 
@@ -345,7 +345,7 @@ bool CircleCollisionComputeShader::pick_physical_device()
 
 	if (selected_device < 0)
 	{
-		Log("No Suitable Physical Device Found.");
+		log("No Suitable Physical Device Found.");
 		return false;
 	}
 
@@ -473,7 +473,7 @@ bool CircleCollisionComputeShader::create_swap_chain()
 
 	if (properties.formats.empty())
 	{
-		Log("No Format Exists for this Physical Device");
+		log("No Format Exists for this Physical Device");
 		return false;
 	}
 
@@ -634,7 +634,7 @@ bool CircleCollisionComputeShader::create_renderpass()
 
 	if (vkCreateRenderPass(this->device, &render_pass_info, nullptr, &this->render_pass) != VK_SUCCESS)
 	{
-		Log("Create Render Pass Failed.");
+		log("Create Render Pass Failed.");
 		return false;
 	}
 
@@ -668,7 +668,7 @@ bool CircleCollisionComputeShader::create_graphics_pipeline()
 
 	if (vert_shader.empty() || frag_shader.empty())
 	{
-		Log("Make sure shaders are correctly read from file.");
+		log("Make sure shaders are correctly read from file.");
 		return false;
 	}
 
@@ -772,7 +772,7 @@ bool CircleCollisionComputeShader::create_graphics_pipeline()
 
 	if (vkCreatePipelineLayout(this->device, &pipeline_layout_info, nullptr, &this->pipeline_layout) != VK_SUCCESS)
 	{
-		Log("Create Pipeline Layout Failed.");
+		log("Create Pipeline Layout Failed.");
 
 		vkDestroyShaderModule(this->device, vert_shader_module, nullptr);
 		vkDestroyShaderModule(this->device, frag_shader_module, nullptr);
@@ -815,7 +815,7 @@ bool CircleCollisionComputeShader::create_graphics_pipeline()
 		nullptr,
 		&this->graphics_pipeline) != VK_SUCCESS)
 	{
-		Log("Create Pipeline Failed.");
+		log("Create Pipeline Failed.");
 
 		free(shader_stages);
 		vkDestroyShaderModule(this->device, vert_shader_module, nullptr);
@@ -1034,7 +1034,7 @@ bool CircleCollisionComputeShader::create_frame_buffers()
 
 		if (vkCreateFramebuffer(this->device, &create_info, nullptr, &this->swap_chain_frame_buffers[i]) != VK_SUCCESS)
 		{
-			Log("Couldn't Create Frame Buffer, " << i);
+			log("Couldn't Create Frame Buffer, " << i);
 			return false;
 		}
 	}
@@ -1052,7 +1052,7 @@ bool CircleCollisionComputeShader::create_command_pool()
 
 	if (vkCreateCommandPool(this->device, &create_info, nullptr, &this->command_pool) != VK_SUCCESS)
 	{
-		Log("Coudn't Create Command Pool");
+		log("Coudn't Create Command Pool");
 		return false;
 	}
 
@@ -1071,7 +1071,7 @@ bool CircleCollisionComputeShader::create_command_buffers()
 
 	if (vkAllocateCommandBuffers(this->device, &cmd_buffer_alloc_info, this->command_buffers.data()) != VK_SUCCESS)
 	{
-		Log("Couldn't Allocate Command Buffers");
+		log("Couldn't Allocate Command Buffers");
 		return false;
 	}
 
@@ -1084,7 +1084,7 @@ bool CircleCollisionComputeShader::create_command_buffers()
 
 		if (vkBeginCommandBuffer(this->command_buffers[i], &command_buffer_begin_info) != VK_SUCCESS)
 		{
-			Log("Coudn't Begin Command Buffer");
+			log("Coudn't Begin Command Buffer");
 			return false;
 		}
 
@@ -1129,7 +1129,7 @@ bool CircleCollisionComputeShader::create_command_buffers()
 
 		if (vkEndCommandBuffer(this->command_buffers[i]) != VK_SUCCESS)
 		{
-			Log("vkEndCommandBuffer Failed.");
+			log("vkEndCommandBuffer Failed.");
 			return false;
 		}
 	}
@@ -1159,7 +1159,7 @@ bool CircleCollisionComputeShader::create_sync_objects()
 			|| vkCreateSemaphore(this->device, &semaphore_info, nullptr, &this->render_finished_semaphore[i]) != VK_SUCCESS
 			|| vkCreateFence(this->device, &fence_info, nullptr, &this->draw_fences[i]) != VK_SUCCESS)
 		{
-			Log("Couldn't Create Semaphores.");
+			log("Couldn't Create Semaphores.");
 			return false;
 		}
 	}
@@ -1287,7 +1287,7 @@ void CircleCollisionComputeShader::update(const uint32_t& current_image)
 		draw = true;
 		double xpos, ypos;
 		glfwGetCursorPos(window, &xpos, &ypos);
-		mouse_pos = glm::vec2(xpos, INIT_HEIGHT - ypos);
+		mouse_pos = glm::vec2(xpos, screen_height - ypos);
 	}
 
 	this->compute.push_constant.draw = (mouse_state == GLFW_PRESS);
@@ -1342,12 +1342,12 @@ bool CircleCollisionComputeShader::draw_frame()
 		if (recreate_swap_chain())
 		{
 			this->should_recreate_swapchain = false;
-			Log("SwapChain Recreate");
+			log("SwapChain Recreate");
 			return true;
 		}
 		else
 		{
-			Log("Failed SwapChain Recreatation.");
+			log("Failed SwapChain Recreatation.");
 		}
 	}
 
@@ -1371,7 +1371,7 @@ bool CircleCollisionComputeShader::draw_frame()
 	vkResetFences(this->device, 1, &this->draw_fences[this->current_frame]);
 	if (vkQueueSubmit(this->graphics_queue, 1, &submit_info, this->draw_fences[this->current_frame]) != VK_SUCCESS)
 	{
-		Log("vkQueueSubmit Failed");
+		log("vkQueueSubmit Failed");
 		return false;
 	}
 
@@ -1392,12 +1392,12 @@ bool CircleCollisionComputeShader::draw_frame()
 		if (recreate_swap_chain())
 		{
 			this->should_recreate_swapchain = false;
-			Log("SwapChain Recreate");
+			log("SwapChain Recreate");
 			return true;
 		}
 		else
 		{
-			Log("Failed SwapChain Recreatation.");
+			log("Failed SwapChain Recreatation.");
 		}
 	}
 
@@ -1577,8 +1577,8 @@ bool CircleCollisionComputeShader::prepare_compute_buffers()
 		return false;
 
 	this->compute.push_constant = {};
-	this->compute.push_constant.right = INIT_WIDTH;
-	this->compute.push_constant.bottom = INIT_HEIGHT;
+	this->compute.push_constant.right = screen_width;
+	this->compute.push_constant.bottom = screen_height;
 	this->compute.push_constant.draw = false;
 
 	return true;
@@ -1966,7 +1966,7 @@ void CircleCollisionComputeShader::setup_circles()
 {
 	this->circles.resize(instance_count);
 
-	const int max_size = relative_scale * glm::sqrt((INIT_WIDTH * INIT_HEIGHT) / instance_count) * 0.5f;
+	const int max_size = relative_scale * glm::sqrt((screen_width * screen_height) / instance_count) * 0.5f;
 	const int min_size = max_size / 3;
 
 	for (size_t i = 0; i < instance_count; ++i)
@@ -1976,8 +1976,8 @@ void CircleCollisionComputeShader::setup_circles()
 		this->circles.velocities[i] = relative_velocity * glm::vec2(((rand() % 100) / 200.0f) * ((rand() % 2) * 2 - 1.0f), (rand() % 100) / 200.0f * ((rand() % 2) * 2 - 1.0f)) / glm::sqrt(this->circles.scales[i]) * 3.0f;
 
 		this->circles.positions[i] = glm::vec2(
-			this->circles.scales[i] + rand() % (INIT_WIDTH - 2 * static_cast<int>(this->circles.scales[i])),
-			this->circles.scales[i] + rand() % (INIT_HEIGHT - 2 * static_cast<int>(this->circles.scales[i])));
+			this->circles.scales[i] + rand() % (screen_width - 2 * static_cast<int>(this->circles.scales[i])),
+			this->circles.scales[i] + rand() % (screen_height - 2 * static_cast<int>(this->circles.scales[i])));
 
 		this->circles.colors[i] = glm::vec3((rand() % 255) / 255.0f, (rand() % 255) / 255.0f, (rand() % 255) / 255.0f);
 	}

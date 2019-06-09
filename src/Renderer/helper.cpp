@@ -194,7 +194,7 @@ namespace renderer
 			VkShaderModule shader_module;
 
 			if (vkCreateShaderModule(device, &create_info, nullptr, &shader_module) != VK_SUCCESS)
-				Log("Shader Coudn't be created");
+				log("Shader Coudn't be created");
 
 			return shader_module;
 		}

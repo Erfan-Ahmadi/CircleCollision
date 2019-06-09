@@ -36,7 +36,7 @@ static float mouse_draw_radius = 30.0f;
 
 static int max_size = relative_scale * glm::sqrt((screen_width * screen_height) / instance_count) * 0.5f;
 static int min_size = max_size / 3;
-static const int max_collisions = max_size / 2;
+static const int max_collisions = 20;
 
 static char title[64];
 
@@ -51,6 +51,37 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
 	std::cerr << "validation layer: " << pCallbackData->pMessage << std::endl << std::endl;
 
 	return VK_FALSE;
+}
+
+namespace simd
+{
+	// Code From https://stackoverflow.com/questions/36932240
+	inline __m256 pack_left_256(const __m256& src, const unsigned int& mask)
+	{
+		uint64_t expanded_mask = _pdep_u64(mask, 0x0101010101010101);
+		expanded_mask *= 0xFF;
+
+		const uint64_t identity_indices = 0x0706050403020100;
+		uint64_t wanted_indices = _pext_u64(identity_indices, expanded_mask);
+
+		__m128i bytevec = _mm_cvtsi64_si128(wanted_indices);
+		__m256i shufmask = _mm256_cvtepu8_epi32(bytevec);
+
+		return _mm256_permutevar8x32_ps(src, shufmask);
+	}
+	
+	inline __m256i pack_left_256_indices(const unsigned int& mask)
+	{
+		uint64_t expanded_mask = _pdep_u64(mask, 0x0101010101010101);
+		expanded_mask *= 0xFF;
+
+		const uint64_t identity_indices = 0x0706050403020100;
+		uint64_t wanted_indices = _pext_u64(identity_indices, expanded_mask);
+
+		__m128i bytevec = _mm_cvtsi64_si128(wanted_indices);
+
+		return _mm256_cvtepu8_epi32(bytevec);
+	}
 }
 
 namespace renderer

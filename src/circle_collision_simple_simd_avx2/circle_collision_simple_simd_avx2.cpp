@@ -19,7 +19,6 @@
 #include <immintrin.h>
 
 // SIMD Constants
-
 #define SIMD
 
 using namespace renderer;
@@ -32,21 +31,6 @@ const std::vector<const char*> required_validation_layers =
 const std::vector<const char*> device_extensions = {
 	VK_KHR_SWAPCHAIN_EXTENSION_NAME
 };
-
-// Code From https://stackoverflow.com/questions/36932240
-inline __m256 pack_left_256(const __m256& src, const unsigned int& mask)
-{
-	uint64_t expanded_mask = _pdep_u64(mask, 0x0101010101010101);
-	expanded_mask *= 0xFF;
-
-	const uint64_t identity_indices = 0x0706050403020100;
-	uint64_t wanted_indices = _pext_u64(identity_indices, expanded_mask);
-
-	__m128i bytevec = _mm_cvtsi64_si128(wanted_indices);
-	__m256i shufmask = _mm256_cvtepu8_epi32(bytevec);
-
-	return _mm256_permutevar8x32_ps(src, shufmask);
-}
 
 static int64_t sum = 0;
 static size_t count = 0;
@@ -1350,12 +1334,6 @@ void CircleCollisionSIMD::update(const uint32_t& current_image)
 
 	std::vector<std::pair<size, size>> collided;
 
-#if defined(SIMD)
-
-	size* collisions = static_cast<size*>(malloc(sizeof(size) * max_collisions));
-
-	float resultf[8];
-
 	// 1 to 8 Relationshop
 	for (size i = 0; i < instance_count; ++i)
 	{
@@ -1379,16 +1357,18 @@ void CircleCollisionSIMD::update(const uint32_t& current_image)
 			const __m256 radii = _mm256_add_ps(s_i, s_js);
 			const __m256 radii2 = _mm256_mul_ps(radii, radii);
 
-			const __m256 result = _mm256_cmp_ps(dis2, radii2, _CMP_GT_OQ);
+			const __m256 result = _mm256_cmp_ps(dis2, radii2, _CMP_LE_OQ);
 
-			_mm256_storeu_ps(resultf, result);
+			const uint32_t mask = _mm256_movemask_ps(result);
 
-			for (short m = 0; m < 8; ++m)
+			const __m256i offset = _mm256_set1_epi32(j);
+			const __m256i indices = _mm256_add_epi32(simd::pack_left_256_indices(mask), offset);
+
+			size collisions[8];
+			_mm256_store_si256((__m256i*)(&collisions), indices);
+			for (size k = 0; k < _mm_popcnt_u32(mask); ++k)
 			{
-				if (resultf[m] == 0)
-				{
-					collided.push_back(std::pair<size, size>(i, j + m));
-				}
+				collided.push_back(std::pair<size, size>(i, collisions[k]));
 			}
 		}
 
@@ -1406,23 +1386,6 @@ void CircleCollisionSIMD::update(const uint32_t& current_image)
 			}
 		}
 	}
-#else
-	for (size_t i = 0; i < instance_count; ++i)
-	{
-		for (size_t j = i + 1; j < instance_count; ++j)
-		{
-			const auto dx = this->circles.x_positions[i] - this->circles.x_positions[j];
-			const auto dy = this->circles.y_positions[i] - this->circles.y_positions[j];
-			const auto dis2 = (dy * dy + dx * dx);
-			const auto radii = this->circles.scales[i] + this->circles.scales[j];
-
-			if (dis2 < radii * radii)
-			{
-				collided.push_back(std::pair<size_t, size_t>(i, j));
-			}
-		}
-	}
-#endif
 
 	const auto t2 = std::chrono::high_resolution_clock::now();
 

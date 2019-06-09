@@ -32,8 +32,8 @@ const std::vector<const char*> device_extensions = {
 	VK_KHR_SWAPCHAIN_EXTENSION_NAME
 };
 
-static int64_t sum = 0;
-static size_t count = 0;
+static int64_t sum_time = 0;
+static size_t count_frames = 0;
 
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
@@ -1304,6 +1304,8 @@ void CircleCollisionSIMD::update(const uint32_t& current_image)
 		this->circles.y_positions[i] += this->circles.velocities[i].y * this->frame_timer;
 	}
 
+	const auto t1 = std::chrono::high_resolution_clock::now();
+
 	// Handle Walls
 	for (size_t i = 0; i < instance_count; ++i)
 	{
@@ -1330,7 +1332,7 @@ void CircleCollisionSIMD::update(const uint32_t& current_image)
 		}
 	}
 
-	const auto t1 = std::chrono::high_resolution_clock::now();
+	const auto t2 = std::chrono::high_resolution_clock::now();
 
 	std::vector<std::pair<size, size>> collided;
 
@@ -1386,8 +1388,6 @@ void CircleCollisionSIMD::update(const uint32_t& current_image)
 			}
 		}
 	}
-
-	const auto t2 = std::chrono::high_resolution_clock::now();
 
 	// Takes Less than 0.1 (ms) Not Worth Optimizing Now
 	for (size k = 0; k < collided.size(); ++k)
@@ -1557,8 +1557,8 @@ bool CircleCollisionSIMD::main_loop()
 
 			//sprintf_s(title, "%d FPS in %.8f (ms)", this->last_fps, this->frame_timer);
 
-			sum += fps_timer;
-			count += this->frame_counter;
+			sum_time += fps_timer;
+			count_frames += this->frame_counter;
 
 			glfwSetWindowTitle(this->window, title);
 
@@ -1568,11 +1568,11 @@ bool CircleCollisionSIMD::main_loop()
 
 		glfwPollEvents();
 
-		if (count > 500)
+		if (count_frames > 500)
 		{
-			std::cout << "Average Frame Time: " << (float)sum / count << std::endl;
-			sum = 0;
-			count = 0;
+			std::cout << "Average Frame Time: " << (float)sum_time / count_frames << std::endl;
+			sum_time = 0;
+			count_frames = 0;
 			//return true;
 		}
 

@@ -18,8 +18,76 @@
 
 #include <immintrin.h>
 
+static int64_t sum_time = 0;
+static size_t count_frames = 0;
+
 // SIMD Constants
 #define SIMD
+
+static __m256 zero = _mm256_set1_ps(0);
+static __m256 one = _mm256_set1_ps(1);
+static __m256 minus_two = _mm256_set1_ps(-2);
+static __m256 width_vec = _mm256_set1_ps(screen_width);
+static __m256 height_vec = _mm256_set1_ps(screen_height);
+
+inline float rand_vel_pre()
+{
+	return relative_velocity * (((rand() % 100) / 200.0f) * ((rand() % 2) * 2 - 1.0f)) * 3.0f;
+}
+
+inline __m256 rand_vel_vec(const __m256& scale)
+{
+	const __m256 pre = _mm256_setr_ps(
+		rand_vel_pre(),
+		rand_vel_pre(),
+		rand_vel_pre(),
+		rand_vel_pre(),
+		rand_vel_pre(),
+		rand_vel_pre(),
+		rand_vel_pre(),
+		rand_vel_pre());
+	return _mm256_div_ps(pre, _mm256_sqrt_ps(scale));
+}
+
+inline float rand_pos(const int& max)
+{
+	return rand() % (max - 2);
+}
+
+inline __m256 rand_pos_vec(const __m256& scale, const int& max)
+{
+	__m256 add = _mm256_setr_ps(
+		rand_pos(max),
+		rand_pos(max),
+		rand_pos(max),
+		rand_pos(max),
+		rand_pos(max),
+		rand_pos(max),
+		rand_pos(max),
+		rand_pos(max));
+
+	return _mm256_add_ps(scale, add);
+}
+
+inline float rand_scale()
+{
+	return min_size + (rand() % (max_size - min_size));
+}
+
+inline __m256 rand_scale_vec()
+{
+	return _mm256_setr_ps(
+		rand_scale(),
+		rand_scale(),
+		rand_scale(),
+		rand_scale(),
+		rand_scale(),
+		rand_scale(),
+		rand_scale(),
+		rand_scale()
+	);
+}
+
 
 using namespace renderer;
 
@@ -31,9 +99,6 @@ const std::vector<const char*> required_validation_layers =
 const std::vector<const char*> device_extensions = {
 	VK_KHR_SWAPCHAIN_EXTENSION_NAME
 };
-
-static int64_t sum = 0;
-static size_t count = 0;
 
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
@@ -1304,124 +1369,63 @@ void CircleCollisionSIMD::update(const uint32_t& current_image)
 			_mm256_mul_ps(this->circles.y_velocities[i], frame_time_vec));
 	}
 
-/*
-	// Handle Walls
-	for (size_t i = 0; i < instance_count; ++i)
-	{
-		if (this->circles.y_positions[i] - this->circles.scales[i] <= 0)
-		{
-			this->circles.y_positions[i] = this->circles.scales[i];
-			this->circles.velocities[i].y *= -1;
-		}
-		else if (this->circles.y_positions[i] + this->circles.scales[i] >= bottom_wall)
-		{
-			this->circles.y_positions[i] = bottom_wall - this->circles.scales[i];
-			this->circles.velocities[i].y *= -1;
-		}
-
-		if (this->circles.x_positions[i] - this->circles.scales[i] <= 0)
-		{
-			this->circles.x_positions[i] = this->circles.scales[i];
-			this->circles.velocities[i].x *= -1;
-		}
-		else if (this->circles.x_positions[i] + this->circles.scales[i] >= right_wall)
-		{
-			this->circles.x_positions[i] = right_wall - this->circles.scales[i];
-			this->circles.velocities[i].x *= -1;
-		}
-	}
 
 	const auto t1 = std::chrono::high_resolution_clock::now();
 
-	std::vector<std::pair<size, size>> collided;
-
-	// 1 to 8 Relationshop
-	for (size i = 0; i < instance_count; ++i)
+	// Handle Walls
+	for (size_t i = 0; i < vectors_size; ++i)
 	{
-		const __m256 x_i = _mm256_set1_ps(this->circles.x_positions[i]);
-		const __m256 y_i = _mm256_set1_ps(this->circles.y_positions[i]);
-		const __m256 s_i = _mm256_set1_ps(this->circles.scales[i]);
-		const size remainder = (instance_count - i - 1) % 8; // 8 floats
+		// Left
+		const __m256 left = _mm256_sub_ps(this->circles.x_positions[i], this->circles.scales[i]);
+		__m256 cmp = _mm256_cmp_ps(left, zero, _CMP_LE_OQ);
+		__m256 clamped = _mm256_min_ps(cmp, _mm256_set1_ps(1));
+		__m256 inverse = _mm256_sub_ps(one, clamped);
+		__m256 mul = _mm256_fmadd_ps(clamped, minus_two, one);
+		this->circles.x_velocities[i] = _mm256_mul_ps(this->circles.x_velocities[i], mul);
+		this->circles.x_positions[i] = _mm256_add_ps(_mm256_mul_ps(inverse, this->circles.x_positions[i]), _mm256_mul_ps(clamped, this->circles.scales[i]));
 
-		// SIMD
-		for (size j = i + 1; j < (instance_count - remainder); j += 8)
-		{
-			const __m256 x_js = _mm256_load_ps(&this->circles.x_positions[j]);
-			const __m256 y_js = _mm256_load_ps(&this->circles.y_positions[j]);
-			const __m256 s_js = _mm256_load_ps(&this->circles.scales[j]);
+		// Right
+		const __m256 right = _mm256_add_ps(this->circles.x_positions[i], this->circles.scales[i]);
+		cmp = _mm256_cmp_ps(right, width_vec, _CMP_GE_OQ);
+		clamped = _mm256_min_ps(cmp, _mm256_set1_ps(1));
+		inverse = _mm256_sub_ps(one, clamped);
+		mul = _mm256_fmadd_ps(clamped, minus_two, one);
+		this->circles.x_velocities[i] = _mm256_mul_ps(this->circles.x_velocities[i], mul);
+		this->circles.x_positions[i] = _mm256_add_ps(_mm256_mul_ps(inverse, this->circles.x_positions[i]), _mm256_mul_ps(clamped, _mm256_sub_ps(width_vec, this->circles.scales[i])));
 
-			const __m256 dx = _mm256_sub_ps(x_js, x_i);
-			const __m256 dy = _mm256_sub_ps(y_js, y_i);
-			const __m256 ds = _mm256_sub_ps(s_js, s_i);
-
-			const __m256 dis2 = _mm256_fmadd_ps(dy, dy, _mm256_mul_ps(dx, dx));
-			const __m256 radii = _mm256_add_ps(s_i, s_js);
-			const __m256 radii2 = _mm256_mul_ps(radii, radii);
-
-			const __m256 result = _mm256_cmp_ps(dis2, radii2, _CMP_LE_OQ);
-
-			const uint32_t mask = _mm256_movemask_ps(result);
-
-			const __m256i offset = _mm256_set1_epi32(j);
-			const __m256i indices = _mm256_add_epi32(simd::pack_left_256_indices(mask), offset);
-
-			size collisions[8];
-			_mm256_store_si256((__m256i*)(&collisions), indices);
-			for (size k = 0; k < _mm_popcnt_u32(mask); ++k)
-			{
-				collided.push_back(std::pair<size, size>(i, collisions[k]));
-			}
-		}
-
-		// Sequential
-		for (size j = instance_count - remainder; j < instance_count; ++j)
-		{
-			const auto dx = this->circles.x_positions[i] - this->circles.x_positions[j];
-			const auto dy = this->circles.y_positions[i] - this->circles.y_positions[j];
-			const auto dis2 = (dy * dy + dx * dx);
-			const auto radii = this->circles.scales[i] + this->circles.scales[j];
-
-			if (dis2 < radii * radii)
-			{
-				collided.push_back(std::pair<size_t, size_t>(i, j));
-			}
-		}
+		
+		// Bottom
+		const __m256 bottom = _mm256_sub_ps(this->circles.y_positions[i], this->circles.scales[i]);
+		cmp = _mm256_cmp_ps(bottom, zero, _CMP_LE_OQ);
+		clamped = _mm256_min_ps(cmp, _mm256_set1_ps(1));
+		inverse = _mm256_sub_ps(one, clamped);
+		mul = _mm256_fmadd_ps(clamped, minus_two, one);
+		this->circles.y_velocities[i] = _mm256_mul_ps(this->circles.y_velocities[i], mul);
+		this->circles.y_positions[i] = _mm256_add_ps(_mm256_mul_ps(inverse, this->circles.y_positions[i]), _mm256_mul_ps(clamped, this->circles.scales[i]));
+		
+		// Top
+		const __m256 top = _mm256_add_ps(this->circles.y_positions[i], this->circles.scales[i]);
+		cmp = _mm256_cmp_ps(top, height_vec, _CMP_GE_OQ);
+		clamped = _mm256_min_ps(cmp, _mm256_set1_ps(1));
+		inverse = _mm256_sub_ps(one, clamped);
+		mul = _mm256_fmadd_ps(clamped, minus_two, one);
+		this->circles.y_velocities[i] = _mm256_mul_ps(this->circles.y_velocities[i], mul);
+		this->circles.y_positions[i] = _mm256_add_ps(_mm256_mul_ps(inverse, this->circles.y_positions[i]), _mm256_mul_ps(clamped, _mm256_sub_ps(height_vec, this->circles.scales[i])));
 	}
 
 	const auto t2 = std::chrono::high_resolution_clock::now();
-	// Takes Less than 0.1 (ms) Not Worth Optimizing Now
-	for (size k = 0; k < collided.size(); ++k)
-	{
-		int i = collided[k].first;
-		int j = collided[k].second;
+	const auto detection = std::chrono::duration<double, std::milli>(t2 - t1).count();
+	sprintf_s(title, "Wall Handle: %.8f (ms)", detection);
 
-		const auto dx = this->circles.x_positions[i] - this->circles.x_positions[j];
-		const auto dy = this->circles.y_positions[i] - this->circles.y_positions[j];
-		const auto radii = this->circles.scales[i] + this->circles.scales[j];
-
-		// Move Away
-		const auto dis = glm::sqrt((dy * dy + dx * dx));
-		const auto n = glm::vec2(dx / dis, dy / dis);
-		const auto covered = radii - dis;
-		const auto move_vec = n * (covered / 2.0f);
-		this->circles.x_positions[i] += move_vec.x;
-		this->circles.y_positions[i] += move_vec.y;
-		this->circles.x_positions[j] -= move_vec.x;
-		this->circles.y_positions[j] -= move_vec.y;
-
-		// Change Velocity Direction
-		const auto m1 = this->circles.scales[i] * 5.0f;
-		const auto m2 = this->circles.scales[j] * 5.0f;
-		const auto p = 2 * (glm::dot(n, this->circles.velocities[i]) - glm::dot(n, this->circles.velocities[j])) / (m1 + m2);
-		this->circles.velocities[i] = (this->circles.velocities[i] - n * m2 * p);
-		this->circles.velocities[j] = (this->circles.velocities[j] + n * m1 * p);
-	}
+	/*
+	const auto t1 = std::chrono::high_resolution_clock::now();
+	const auto t2 = std::chrono::high_resolution_clock::now();\
 	const auto t3 = std::chrono::high_resolution_clock::now();
 	const auto detection = std::chrono::duration<double, std::milli>(t2 - t1).count();
 	const auto handle = std::chrono::duration<double, std::milli>(t3 - t2).count();
 
 	sprintf_s(title, "Detection: %.8f (ms) - Handle: %.8f (ms)", detection, handle);
-*/
+	*/
 
 	if (draw)
 		draw = false;
@@ -1557,8 +1561,8 @@ bool CircleCollisionSIMD::main_loop()
 
 			//sprintf_s(title, "%d FPS in %.8f (ms)", this->last_fps, this->frame_timer);
 
-			sum += fps_timer;
-			count += this->frame_counter;
+			sum_time += fps_timer;
+			count_frames += this->frame_counter;
 
 			glfwSetWindowTitle(this->window, title);
 
@@ -1568,11 +1572,11 @@ bool CircleCollisionSIMD::main_loop()
 
 		glfwPollEvents();
 
-		if (count > 500)
+		if (count_frames > 500)
 		{
-			std::cout << "Average Frame Time: " << (float)sum / count << std::endl;
-			sum = 0;
-			count = 0;
+			std::cout << "Average Frame Time: " << (float)sum_time / count_frames << std::endl;
+			sum_time = 0;
+			count_frames = 0;
 			//return true;
 		}
 
@@ -1767,71 +1771,25 @@ bool CircleCollisionSIMD::create_scales_buffer()
 	return true;
 }
 
-inline float rand_vel(const float& scale)
-{
-	return relative_velocity * (((rand() % 100) / 200.0f) * ((rand() % 2) * 2 - 1.0f)) / glm::sqrt(scale) * 3.0f;
-}
-
-inline float rand_pos(const float& scale, const int& max)
-{
-	return scale + rand() % (max - 2 * static_cast<int>(scale));
-}
-
-
 void CircleCollisionSIMD::setup_circles()
 {
 	this->circles.resize();
 
 	for (size_t i = 0; i < instance_count; ++i)
 	{
-		this->circles.scales[i] = min_size + (rand() % (max_size - min_size));
 		this->circles.colors[i] = glm::vec3((rand() % 255) / 255.0f, (rand() % 255) / 255.0f, (rand() % 255) / 255.0f);
 	}
-		
+
 	for (size_t i = 0; i < vectors_size; ++i)
 	{
-		this->circles.x_velocities[i] = _mm256_setr_ps(
-			rand_vel(this->circles.scales[i + 0]),
-			rand_vel(this->circles.scales[i + 1]),
-			rand_vel(this->circles.scales[i + 2]),
-			rand_vel(this->circles.scales[i + 3]),
-			rand_vel(this->circles.scales[i + 4]),
-			rand_vel(this->circles.scales[i + 5]),
-			rand_vel(this->circles.scales[i + 6]),
-			rand_vel(this->circles.scales[i + 7])
-		);
-		
-		this->circles.y_velocities[i] = _mm256_setr_ps(
-			rand_vel(this->circles.scales[i + 0]),
-			rand_vel(this->circles.scales[i + 1]),
-			rand_vel(this->circles.scales[i + 2]),
-			rand_vel(this->circles.scales[i + 3]),
-			rand_vel(this->circles.scales[i + 4]),
-			rand_vel(this->circles.scales[i + 5]),
-			rand_vel(this->circles.scales[i + 6]),
-			rand_vel(this->circles.scales[i + 7])
-		);
-		
-		this->circles.x_positions[i] = _mm256_setr_ps(
-			rand_pos(this->circles.scales[i + 0], screen_width),
-			rand_pos(this->circles.scales[i + 1], screen_width),
-			rand_pos(this->circles.scales[i + 2], screen_width),
-			rand_pos(this->circles.scales[i + 3], screen_width),
-			rand_pos(this->circles.scales[i + 4], screen_width),
-			rand_pos(this->circles.scales[i + 5], screen_width),
-			rand_pos(this->circles.scales[i + 6], screen_width),
-			rand_pos(this->circles.scales[i + 7], screen_width)
-		);
-		
-		this->circles.y_positions[i] = _mm256_setr_ps(
-			rand_pos(this->circles.scales[i + 0], screen_height),
-			rand_pos(this->circles.scales[i + 1], screen_height),
-			rand_pos(this->circles.scales[i + 2], screen_height),
-			rand_pos(this->circles.scales[i + 3], screen_height),
-			rand_pos(this->circles.scales[i + 4], screen_height),
-			rand_pos(this->circles.scales[i + 5], screen_height),
-			rand_pos(this->circles.scales[i + 6], screen_height),
-			rand_pos(this->circles.scales[i + 7], screen_height)
-		);
+		this->circles.scales[i] = rand_scale_vec();
+
+		this->circles.x_velocities[i] = rand_vel_vec(this->circles.scales[i]);
+		this->circles.y_velocities[i] = rand_vel_vec(this->circles.scales[i]);
+
+		this->circles.x_positions[i] = rand_pos_vec(this->circles.scales[i], screen_width);
+		this->circles.y_positions[i] = rand_pos_vec(this->circles.scales[i], screen_height);
 	}
+
+	const size padding_count = dividible_size - instance_count;
 }

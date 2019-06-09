@@ -14,7 +14,8 @@ struct circles_strcut
 	__m256* x_velocities;
 	__m256* y_velocities;
 
-	float* scales;
+	__m256* scales;
+
 	glm::vec3* colors;
 
 	inline void resize()
@@ -24,9 +25,10 @@ struct circles_strcut
 
 		x_velocities = static_cast<__m256*>(_aligned_malloc(sizeof(__m256) * vectors_size, alignof(__m256)));
 		y_velocities = static_cast<__m256*>(_aligned_malloc(sizeof(__m256) * vectors_size, alignof(__m256)));
+		
+		scales = static_cast<__m256*>(_aligned_malloc(sizeof(__m256) * vectors_size, alignof(__m256)));
 
 		colors = static_cast<glm::vec3*>(malloc(sizeof(glm::vec3) * instance_count));
-		scales = static_cast<float*>(_aligned_malloc(sizeof(float) * instance_count, alignof(float)));
 	}
 
 	void release()

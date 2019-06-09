@@ -26,8 +26,8 @@ const std::vector<const char*> device_extensions = {
 	VK_KHR_SWAPCHAIN_EXTENSION_NAME
 };
 
-static int64_t sum = 0;
-static size_t count = 0;
+static int64_t sum_time = 0;
+static size_t count_frames = 0;
 
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
@@ -1281,8 +1281,6 @@ void CircleCollisionSimple::update(const uint32_t& current_image)
 		this->circles.positions[i] += this->circles.velocities[i] * this->frame_timer;
 	}
 
-	std::vector<std::pair<size_t, size_t>> collided;
-
 	for (size_t i = 0; i < instance_count; ++i)
 	{
 		if (this->circles.positions[i].y - this->circles.scales[i] <= 0)
@@ -1306,7 +1304,12 @@ void CircleCollisionSimple::update(const uint32_t& current_image)
 			this->circles.positions[i].x = right_wall - this->circles.scales[i];
 			this->circles.velocities[i].x *= -1;
 		}
+	}
 
+	std::vector<std::pair<size_t, size_t>> collided;
+
+	for (size_t i = 0; i < instance_count; ++i)
+	{
 		for (size_t j = i + 1; j < instance_count; ++j)
 		{
 			const auto dx = this->circles.positions[i].x - this->circles.positions[j].x;
@@ -1476,8 +1479,8 @@ bool CircleCollisionSimple::main_loop()
 
 			sprintf_s(title, "%d FPS in %.8f (ms)", this->last_fps, this->frame_timer);
 
-			sum += fps_timer;
-			count += this->frame_counter;
+			sum_time += fps_timer;
+			count_frames += this->frame_counter;
 
 			glfwSetWindowTitle(this->window, title);
 
@@ -1487,11 +1490,11 @@ bool CircleCollisionSimple::main_loop()
 
 		glfwPollEvents();
 
-		if (count > 500)
+		if (count_frames > 500)
 		{
-			std::cout << "Average Frame Time: " << (float)sum / count << std::endl;
-			sum = 0;
-			count = 0;
+			std::cout << "Average Frame Time: " << (float)sum_time / count_frames << std::endl;
+			sum_time = 0;
+			count_frames = 0;
 			//return true;
 		}
 

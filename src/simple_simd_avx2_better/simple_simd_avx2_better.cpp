@@ -24,6 +24,37 @@ static size_t count_frames = 0;
 // SIMD Constants
 #define SIMD
 
+// 8x8 Latin Square
+__m256i rows[8] =
+{
+_mm256_setr_epi32(0,1,7,2,6,3,5,4),
+_mm256_setr_epi32(1,2,0,3,7,4,6,5),
+_mm256_setr_epi32(2,3,1,4,0,5,7,6),
+_mm256_setr_epi32(3,4,2,5,1,6,0,7),
+_mm256_setr_epi32(4,5,3,6,2,7,1,0),
+_mm256_setr_epi32(5,6,4,7,3,0,2,1),
+_mm256_setr_epi32(6,7,5,0,4,1,3,2),
+_mm256_setr_epi32(7,0,6,1,5,2,4,3)
+};
+
+__m256i self_check_rows[4] =
+{
+_mm256_setr_epi32(1,2,3,4,5,6,7,0),
+_mm256_setr_epi32(2,3,4,5,6,7,0,1),
+_mm256_setr_epi32(3,4,5,6,7,0,1,2),
+_mm256_setr_epi32(4,5,6,7,0,1,2,3),
+};
+
+__m256i reverse_self_check_rows[4] =
+{
+_mm256_setr_epi32(7,0,1,2,3,4,5,6),
+_mm256_setr_epi32(6,7,0,1,2,3,4,5),
+_mm256_setr_epi32(5,6,7,0,1,2,3,4),
+_mm256_setr_epi32(4,5,6,7,0,1,2,3),
+};
+
+__m256 last_self_check_mask = _mm256_setr_ps(1, 1, 1, 1, 0, 0, 0, 0);
+
 static __m256 zero = _mm256_set1_ps(0);
 static __m256 one = _mm256_set1_ps(1);
 static __m256 minus_two = _mm256_set1_ps(-2);
@@ -1372,60 +1403,88 @@ void CircleCollisionSIMD::update(const uint32_t& current_image)
 
 	const auto t1 = std::chrono::high_resolution_clock::now();
 
-	// Handle Walls
+	// Branches aren't always bad
+	// as tested these branches in the following loop are ~4x better than without them
+	// GUESS: Branch Prediction : since there are less balls on the corners than in the middle
+	// Maybe Balls Count and Window Size might affect the speed up of putting these branches
+	// Compiler = MSVC
+
 	for (size_t i = 0; i < vectors_size; ++i)
 	{
 		// Left
 		const __m256 left = _mm256_sub_ps(this->circles.x_positions[i], this->circles.scales[i]);
 		__m256 cmp = _mm256_cmp_ps(left, zero, _CMP_LE_OQ);
-		__m256 clamped = _mm256_min_ps(cmp, _mm256_set1_ps(1));
-		__m256 inverse = _mm256_sub_ps(one, clamped);
-		__m256 mul = _mm256_fmadd_ps(clamped, minus_two, one);
-		this->circles.x_velocities[i] = _mm256_mul_ps(this->circles.x_velocities[i], mul);
-		this->circles.x_positions[i] = _mm256_add_ps(_mm256_mul_ps(inverse, this->circles.x_positions[i]), _mm256_mul_ps(clamped, this->circles.scales[i]));
+		//if (_mm_popcnt_u64(_mm256_movemask_ps(cmp)) > 0)
+		{
+			__m256 clamped = _mm256_min_ps(cmp, _mm256_set1_ps(1));
+			__m256 inverse = _mm256_sub_ps(one, clamped);
+			__m256 mul = _mm256_fmadd_ps(clamped, minus_two, one);
+			this->circles.x_velocities[i] = _mm256_mul_ps(this->circles.x_velocities[i], mul);
+			this->circles.x_positions[i] = _mm256_add_ps(_mm256_mul_ps(inverse, this->circles.x_positions[i]), _mm256_mul_ps(clamped, this->circles.scales[i]));
+		}
 
 		// Right
 		const __m256 right = _mm256_add_ps(this->circles.x_positions[i], this->circles.scales[i]);
 		cmp = _mm256_cmp_ps(right, width_vec, _CMP_GE_OQ);
-		clamped = _mm256_min_ps(cmp, _mm256_set1_ps(1));
-		inverse = _mm256_sub_ps(one, clamped);
-		mul = _mm256_fmadd_ps(clamped, minus_two, one);
-		this->circles.x_velocities[i] = _mm256_mul_ps(this->circles.x_velocities[i], mul);
-		this->circles.x_positions[i] = _mm256_add_ps(_mm256_mul_ps(inverse, this->circles.x_positions[i]), _mm256_mul_ps(clamped, _mm256_sub_ps(width_vec, this->circles.scales[i])));
+		//if (_mm_popcnt_u64(_mm256_movemask_ps(cmp)) > 0)
+		{
+			__m256 clamped = _mm256_min_ps(cmp, _mm256_set1_ps(1));
+			__m256 inverse = _mm256_sub_ps(one, clamped);
+			__m256 mul = _mm256_fmadd_ps(clamped, minus_two, one);
+			this->circles.x_velocities[i] = _mm256_mul_ps(this->circles.x_velocities[i], mul);
+			this->circles.x_positions[i] = _mm256_add_ps(_mm256_mul_ps(inverse, this->circles.x_positions[i]), _mm256_mul_ps(clamped, _mm256_sub_ps(width_vec, this->circles.scales[i])));
+		}
 
-		
 		// Bottom
 		const __m256 bottom = _mm256_sub_ps(this->circles.y_positions[i], this->circles.scales[i]);
 		cmp = _mm256_cmp_ps(bottom, zero, _CMP_LE_OQ);
-		clamped = _mm256_min_ps(cmp, _mm256_set1_ps(1));
-		inverse = _mm256_sub_ps(one, clamped);
-		mul = _mm256_fmadd_ps(clamped, minus_two, one);
-		this->circles.y_velocities[i] = _mm256_mul_ps(this->circles.y_velocities[i], mul);
-		this->circles.y_positions[i] = _mm256_add_ps(_mm256_mul_ps(inverse, this->circles.y_positions[i]), _mm256_mul_ps(clamped, this->circles.scales[i]));
-		
+		//if (_mm_popcnt_u64(_mm256_movemask_ps(cmp)) > 0)
+		{
+			__m256 clamped = _mm256_min_ps(cmp, _mm256_set1_ps(1));
+			__m256 inverse = _mm256_sub_ps(one, clamped);
+			__m256 mul = _mm256_fmadd_ps(clamped, minus_two, one);
+			this->circles.y_velocities[i] = _mm256_mul_ps(this->circles.y_velocities[i], mul);
+			this->circles.y_positions[i] = _mm256_add_ps(_mm256_mul_ps(inverse, this->circles.y_positions[i]), _mm256_mul_ps(clamped, this->circles.scales[i]));
+		}
+
 		// Top
 		const __m256 top = _mm256_add_ps(this->circles.y_positions[i], this->circles.scales[i]);
 		cmp = _mm256_cmp_ps(top, height_vec, _CMP_GE_OQ);
-		clamped = _mm256_min_ps(cmp, _mm256_set1_ps(1));
-		inverse = _mm256_sub_ps(one, clamped);
-		mul = _mm256_fmadd_ps(clamped, minus_two, one);
-		this->circles.y_velocities[i] = _mm256_mul_ps(this->circles.y_velocities[i], mul);
-		this->circles.y_positions[i] = _mm256_add_ps(_mm256_mul_ps(inverse, this->circles.y_positions[i]), _mm256_mul_ps(clamped, _mm256_sub_ps(height_vec, this->circles.scales[i])));
+		//if (_mm_popcnt_u64(_mm256_movemask_ps(cmp)) > 0)
+		{
+			__m256 clamped = _mm256_min_ps(cmp, _mm256_set1_ps(1));
+			__m256 inverse = _mm256_sub_ps(one, clamped);
+			__m256 mul = _mm256_fmadd_ps(clamped, minus_two, one);
+			this->circles.y_velocities[i] = _mm256_mul_ps(this->circles.y_velocities[i], mul);
+			this->circles.y_positions[i] = _mm256_add_ps(_mm256_mul_ps(inverse, this->circles.y_positions[i]), _mm256_mul_ps(clamped, _mm256_sub_ps(height_vec, this->circles.scales[i])));
+		}
+	}
+	const auto t2 = std::chrono::high_resolution_clock::now();
+
+	for (size i = 0; i < vectors_size; ++i)
+	{
+		// Vector Self Checks
+		for (size_t j = 0; j < 3; ++j)
+		{
+			//const __m128 shuffled = _mm_permutevar_ps(positions[i], self_check_rows[j]);
+			//__m128 cmp = _mm_min_ps(_mm_cmp_ps(shuffled, positions[i], _CMP_EQ_OQ), half_vec);
+			//__m128 add_a = cmp;
+			//__m128 add_b = _mm_permutevar_ps(add_a, reverse_self_check_rows[j]);
+
+		}
+		// Last Self Check
+		{
+			//const __m128 shuffled = _mm_div_ps(_mm_permutevar_ps(positions[i], self_check_rows[j]), last_self_check_mask);
+			//__m128 cmp = _mm_min_ps(_mm_cmp_ps(shuffled, positions[i], _CMP_EQ_OQ), half_vec);
+			//__m128 add_a = cmp;
+			//__m128 add_b = _mm_permutevar_ps(add_a, reverse_self_check_rows[1]);
+		}
 	}
 
-	const auto t2 = std::chrono::high_resolution_clock::now();
-	const auto detection = std::chrono::duration<double, std::milli>(t2 - t1).count();
-	sprintf_s(title, "Wall Handle: %.8f (ms)", detection);
-
-	/*
-	const auto t1 = std::chrono::high_resolution_clock::now();
-	const auto t2 = std::chrono::high_resolution_clock::now();\
 	const auto t3 = std::chrono::high_resolution_clock::now();
 	const auto detection = std::chrono::duration<double, std::milli>(t2 - t1).count();
 	const auto handle = std::chrono::duration<double, std::milli>(t3 - t2).count();
-
-	sprintf_s(title, "Detection: %.8f (ms) - Handle: %.8f (ms)", detection, handle);
-	*/
+	sprintf_s(title, "Wall Handle: %.8f(ms), Collision Handle: %.8f(ms)", detection, handle);
 
 	if (draw)
 		draw = false;

@@ -3,7 +3,7 @@
 #include "../common.hpp"
 #include <chrono>
 
-constexpr size_t dividible_size = instance_count + ((instance_count + 8) % 8);
+constexpr size_t dividible_size = instance_count + 8 - ((instance_count) % 8);
 constexpr size_t vectors_size = dividible_size / 8;
 
 struct circles_strcut

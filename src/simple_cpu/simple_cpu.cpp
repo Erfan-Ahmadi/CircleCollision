@@ -173,7 +173,7 @@ bool CircleCollisionSimple::create_instance()
 	// check if extentions required by glfw is available
 	if (required_validation_layers.size() > available_layer_count)
 	{
-		Log("Validation Layers Not Supported");
+		log("Validation Layers Not Supported");
 		return false;
 	}
 
@@ -189,7 +189,7 @@ bool CircleCollisionSimple::create_instance()
 
 		if (!found_layer)
 		{
-			Log("Validation Layer << " << required_validation_layers[i] << " >> is not available");
+			log("Validation Layer << " << required_validation_layers[i] << " >> is not available");
 			return false;
 		}
 	}

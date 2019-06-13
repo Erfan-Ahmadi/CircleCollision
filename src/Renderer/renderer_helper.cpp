@@ -1,4 +1,5 @@
-#include "common.hpp"
+#include "renderer_helper.h"
+#include <iostream>
 
 namespace renderer
 {
@@ -194,7 +195,7 @@ namespace renderer
 			VkShaderModule shader_module;
 
 			if (vkCreateShaderModule(device, &create_info, nullptr, &shader_module) != VK_SUCCESS)
-				log("Shader Coudn't be created");
+				std::cout << "Shader Coudn't be created" << std::endl;
 
 			return shader_module;
 		}

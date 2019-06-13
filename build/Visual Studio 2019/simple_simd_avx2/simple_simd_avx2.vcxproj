@@ -130,11 +130,12 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\src\common.hpp" />
+    <ClInclude Include="..\..\..\src\Renderer\renderer_helper.h" />
     <ClInclude Include="..\..\..\src\Renderer\vulkan_initializers.hpp" />
     <ClInclude Include="..\..\..\src\simple_simd_avx2\simple_simd_avx2.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\src\helper.cpp" />
+    <ClCompile Include="..\..\..\src\Renderer\renderer_helper.cpp" />
     <ClCompile Include="..\..\..\src\simple_simd_avx2\main.cpp" />
     <ClCompile Include="..\..\..\src\simple_simd_avx2\simple_simd_avx2.cpp" />
   </ItemGroup>

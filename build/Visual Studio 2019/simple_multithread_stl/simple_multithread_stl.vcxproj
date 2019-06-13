@@ -18,24 +18,10 @@
       <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="..\..\..\src\Renderer\renderer_helper.cpp" />
-    <ClCompile Include="..\..\..\src\simple_simd_avx2_better\main.cpp" />
-    <ClCompile Include="..\..\..\src\simple_simd_avx2_better\simple_simd_avx2_better.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="..\..\..\src\common.hpp" />
-    <ClInclude Include="..\..\..\src\Renderer\renderer_helper.h" />
-    <ClInclude Include="..\..\..\src\simple_simd_avx2_better\simple_simd_avx2_better.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="..\..\..\src\simple_simd_avx2_better\shaders\shaders.frag" />
-    <None Include="..\..\..\src\simple_simd_avx2_better\shaders\shaders.vert" />
-  </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
-    <ProjectGuid>{915A1748-BCA3-45ED-A51A-39870A9EA54B}</ProjectGuid>
-    <RootNamespace>simplesimdavx2better</RootNamespace>
+    <ProjectGuid>{7BC28857-8196-4BF1-BB3A-060F688309C9}</ProjectGuid>
+    <RootNamespace>simplemultithreadstl</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -94,7 +80,6 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -139,6 +124,17 @@
       <OptimizeReferences>true</OptimizeReferences>
     </Link>
   </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\src\common.hpp" />
+    <ClInclude Include="..\..\..\src\Renderer\renderer_helper.h" />
+    <ClInclude Include="..\..\..\src\Renderer\vulkan_initializers.hpp" />
+    <ClInclude Include="..\..\..\src\simple_multithread_stl\simple_multithread_stl.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\..\src\Renderer\renderer_helper.cpp" />
+    <ClCompile Include="..\..\..\src\simple_multithread_stl\main.cpp" />
+    <ClCompile Include="..\..\..\src\simple_multithread_stl\simple_multithread_stl.cpp" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

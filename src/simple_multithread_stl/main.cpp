@@ -1,4 +1,4 @@
-#include "simple_cpu.h"
+#include "simple_multithread_stl.h"
 
 int main()
 {

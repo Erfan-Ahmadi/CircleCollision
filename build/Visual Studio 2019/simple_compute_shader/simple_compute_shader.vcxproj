@@ -127,11 +127,12 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\src\common.hpp" />
+    <ClInclude Include="..\..\..\src\Renderer\renderer_helper.h" />
     <ClInclude Include="..\..\..\src\Renderer\vulkan_initializers.hpp" />
     <ClInclude Include="..\..\..\src\simple_compute_shader\simple_compute_shader.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\src\helper.cpp" />
+    <ClCompile Include="..\..\..\src\Renderer\renderer_helper.cpp" />
     <ClCompile Include="..\..\..\src\simple_compute_shader\main.cpp" />
     <ClCompile Include="..\..\..\src\simple_compute_shader\simple_compute_shader.cpp" />
   </ItemGroup>

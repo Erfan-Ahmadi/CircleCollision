@@ -49,11 +49,15 @@ This Project Is For Learning Purposes of Following Topics
    - We Have Circles Here and Math/Physics Calculations are easy.
    
 - **Technologies/API's**
-  - Simple CPU 
-  - Vulkan Compute Shaders
-  - CPU Multi-Threading
-  - OpenCL GPU
-  - SIMD AVX2
+  - **CPU**
+    - Simple Sequential  
+    - Multi-Threaded
+    - SIMD
+      - AVX2
+      - AVX-512
+  - **GPU**
+    - Vulkan Compute Shaders
+    - OpenCL
 
 <img src="https://raw.githubusercontent.com/Erfan-Ahmadi/circle_collision/master/docs/spatial%20partitioning.PNG" alt="" />
 
@@ -62,10 +66,13 @@ This Project Is For Learning Purposes of Following Topics
 - Brute Force
   - [x] [CPU](https://github.com/Erfan-Ahmadi/CircleCollision/tree/master/src/simple_cpu)
   - [x] [Compute Shader](https://github.com/Erfan-Ahmadi/CircleCollision/tree/master/src/simple_compute_shader)
-  - [x] SIMD: AVX2
+  - [x] **SIMD: AVX2**
       - [x] [Load/Store Same Simple Data Structure and Calculate](https://github.com/Erfan-Ahmadi/CircleCollision/tree/master/src/simple_simd_avx2)
       - [x] [All SIMD Data Strcuture](https://github.com/Erfan-Ahmadi/CircleCollision/tree/master/src/simple_simd_avx2_better)
-  - [ ] Multi-Threaded
+  - [ ] **Multi-Threaded**
+    - [ ] OpenMP
+    - [ ] TBB
+    - [ ] STL
   
 
 # Build

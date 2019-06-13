@@ -1580,9 +1580,8 @@ void CircleCollisionSIMD::update(const uint32_t& current_image)
 
 				const __m256 dx = _mm256_sub_ps(x1, circles.x_positions[j]);
 				const __m256 dy = _mm256_sub_ps(y1, circles.y_positions[j]);
-				const __m256 ds = _mm256_sub_ps(s1, circles.scales[j]);
 
-				const __m256 dis2 = _mm256_fmadd_ps(dy, dy, _mm256_mul_ps(dx, dx));
+				const __m256 dis2 = _mm256_fmadd_ps(dy, dy, _mm256_fmadd_ps(dx, dx, zero));
 				const __m256 radii = _mm256_add_ps(circles.scales[j], s1);
 				const __m256 radii2 = _mm256_mul_ps(radii, radii);
 

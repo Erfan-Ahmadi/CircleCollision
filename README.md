@@ -76,7 +76,7 @@ This Project Is For Learning Purposes of Following Topics
   
 
 # Build
-- **MSVC14** 
+- [**Visual Studio 2019**](https://github.com/Erfan-Ahmadi/CircleCollision/tree/master/build/Visual%20Studio%202019) 
 - :soon: **Linux** Builds Will be Added Soon
 
 # Blog 

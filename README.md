@@ -60,9 +60,11 @@ This Project Is For Learning Purposes of Following Topics
 # Implemented
 
 - Brute Force
-  - [x] CPU
-  - [x] Compute Shader
-  - [x] SIMD (AVX2)
+  - [x] [CPU](https://github.com/Erfan-Ahmadi/CircleCollision/tree/master/src/simple_cpu)
+  - [x] [Compute Shader](https://github.com/Erfan-Ahmadi/CircleCollision/tree/master/src/simple_compute_shader)
+  - [x] SIMD: AVX2
+      - [x] [Load/Store Same Simple Data Structure and Calculate](https://github.com/Erfan-Ahmadi/CircleCollision/tree/master/src/simple_simd_avx2)
+      - [x] [All SIMD Data Strcuture](https://github.com/Erfan-Ahmadi/CircleCollision/tree/master/src/simple_simd_avx2_better)
   - [ ] Multi-Threaded
   
 

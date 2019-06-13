@@ -5,11 +5,6 @@
 #include <algorithm>
 #include <stdio.h>
 
-#ifdef _WIN32
-#include <direct.h>
-#define GetCurrentDir _getcwd
-#endif
-
 #define VERTEX_BUFFER_BIND_ID				0 // PER VERTEX
 #define COLOR_BUFFER_BIND_ID				1 // PER INSTANCE
 #define XPOSITIONS_BUFFER_BIND_ID			2 // PER INSTANCE
@@ -72,10 +67,6 @@ void CircleCollisionSIMD::initialize()
 {
 	srand(time(NULL));
 	validation_layers_enabled = false;
-	char current_path[FILENAME_MAX];
-	GetCurrentDir(current_path, sizeof(current_path));
-	current_path[sizeof(current_path) - 1] = '/0';
-	this->app_path = std::string(current_path);
 }
 
 bool CircleCollisionSIMD::run()
@@ -664,8 +655,10 @@ bool CircleCollisionSIMD::create_descriptor_set_layout()
 
 bool CircleCollisionSIMD::create_graphics_pipeline()
 {
-	auto vert_shader = read_file(this->app_path + "\\..\\..\\..\\src\\simple_simd_avx2\\shaders\\shaders.vert.spv");
-	auto frag_shader = read_file(this->app_path + "\\..\\..\\..\\src\\simple_simd_avx2\\shaders\\shaders.frag.spv");
+	std::string path = files::get_app_path();
+
+	auto vert_shader = read_file(path + "\\..\\..\\..\\..\\..\\src\\simple_simd_avx2\\shaders\\shaders.vert.spv");
+	auto frag_shader = read_file(path + "\\..\\..\\..\\..\\..\\src\\simple_simd_avx2\\shaders\\shaders.frag.spv");
 
 	if (vert_shader.empty() || frag_shader.empty())
 	{
@@ -1304,7 +1297,7 @@ void CircleCollisionSIMD::update(const uint32_t& current_image)
 		this->circles.y_positions[i] += this->circles.velocities[i].y * this->frame_timer;
 	}
 
-	const auto t1 = std::chrono::high_resolution_clock::now();
+	//const auto t1 = std::chrono::high_resolution_clock::now();
 
 	// Handle Walls
 	for (size_t i = 0; i < instance_count; ++i)
@@ -1332,7 +1325,7 @@ void CircleCollisionSIMD::update(const uint32_t& current_image)
 		}
 	}
 
-	const auto t2 = std::chrono::high_resolution_clock::now();
+	//const auto t2 = std::chrono::high_resolution_clock::now();
 
 	std::vector<std::pair<size, size>> collided;
 
@@ -1417,11 +1410,11 @@ void CircleCollisionSIMD::update(const uint32_t& current_image)
 		this->circles.velocities[j] = (this->circles.velocities[j] + n * m1 * p);
 	}
 
-	const auto t3 = std::chrono::high_resolution_clock::now();
-	const auto detection = std::chrono::duration<double, std::milli>(t2 - t1).count();
-	const auto handle = std::chrono::duration<double, std::milli>(t3 - t2).count();
+	//const auto t3 = std::chrono::high_resolution_clock::now();
+	//const auto detection = std::chrono::duration<double, std::milli>(t2 - t1).count();
+	//const auto handle = std::chrono::duration<double, std::milli>(t3 - t2).count();
 
-	sprintf_s(title, "Detection: %.8f (ms) - Handle: %.8f (ms)", detection, handle);
+	//sprintf_s(title, "Detection: %.8f (ms) - Handle: %.8f (ms)", detection, handle);
 
 	if (draw)
 		draw = false;
@@ -1555,7 +1548,7 @@ bool CircleCollisionSIMD::main_loop()
 		{
 			this->last_fps = static_cast<uint32_t>((float)frame_counter * (1000.0f / fps_timer));
 
-			//sprintf_s(title, "%d FPS in %.8f (ms)", this->last_fps, this->frame_timer);
+			sprintf_s(title, "%d FPS in %.8f (ms)", this->last_fps, this->frame_timer);
 
 			sum_time += fps_timer;
 			count_frames += this->frame_counter;

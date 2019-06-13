@@ -5,11 +5,6 @@
 #include <algorithm>
 #include <stdio.h>
 
-#ifdef _WIN32
-#include <direct.h>
-#define GetCurrentDir _getcwd
-#endif
-
 #define VERTEX_BUFFER_BIND_ID				0 // PER VERTEX
 #define COLOR_BUFFER_BIND_ID				1 // PER INSTANCE
 #define XPOSITIONS_BUFFER_BIND_ID			2 // PER INSTANCE
@@ -72,7 +67,7 @@ __m256i reverse_self_check_rows[4];
 
 static void generate_rows()
 {
-	for(short i = 0; i < 8; ++i)
+	for (short i = 0; i < 8; ++i)
 	{
 		identity_rows[i] = _mm256_cmp_ps(identity_rows[i], one, _CMP_EQ_OQ);
 	}
@@ -114,10 +109,10 @@ inline __m256 rand_vel_vec(const __m256& scale)
 		rand_vel_pre(),
 		rand_vel_pre(),
 		rand_vel_pre(),
-		0,
-		0,
-		0,
-		0);
+		rand_vel_pre(),
+		rand_vel_pre(),
+		rand_vel_pre(),
+		rand_vel_pre());
 	return _mm256_div_ps(pre, _mm256_sqrt_ps(scale));
 }
 
@@ -209,10 +204,6 @@ void CircleCollisionSIMD::initialize()
 {
 	srand(time(NULL));
 	validation_layers_enabled = false;
-	char current_path[FILENAME_MAX];
-	GetCurrentDir(current_path, sizeof(current_path));
-	current_path[sizeof(current_path) - 1] = '/0';
-	this->app_path = std::string(current_path);
 }
 
 bool CircleCollisionSIMD::run()
@@ -801,15 +792,16 @@ bool CircleCollisionSIMD::create_descriptor_set_layout()
 
 bool CircleCollisionSIMD::create_graphics_pipeline()
 {
-	auto vert_shader = read_file(this->app_path + "\\..\\..\\..\\src\\simple_simd_avx2_better\\shaders\\shaders.vert.spv");
-	auto frag_shader = read_file(this->app_path + "\\..\\..\\..\\src\\simple_simd_avx2_better\\shaders\\shaders.frag.spv");
+	std::string path = files::get_app_path();
+
+	auto vert_shader = read_file(path + "\\..\\..\\..\\..\\..\\src\\simple_simd_avx2_better\\shaders\\shaders.vert.spv");
+	auto frag_shader = read_file(path + "\\..\\..\\..\\..\\..\\src\\simple_simd_avx2_better\\shaders\\shaders.frag.spv");
 
 	if (vert_shader.empty() || frag_shader.empty())
 	{
 		log("Make sure shaders are correctly read from file.");
 		return false;
 	}
-
 	VkShaderModule vert_shader_module = helper::create_shader_module(this->device, vert_shader);
 	VkShaderModule frag_shader_module = helper::create_shader_module(this->device, frag_shader);
 
@@ -1548,7 +1540,7 @@ void CircleCollisionSIMD::update(const uint32_t& current_image)
 				{
 					const __m256 cmp = _mm256_blendv_ps(zero, compare, identity_rows[h]);
 
-					if(_mm256_movemask_ps(cmp) == 0)
+					if (_mm256_movemask_ps(cmp) == 0)
 						continue;
 
 					const __m256 v2_x = _mm256_permutevar8x32_ps(this->circles.x_velocities[i], self_check_rows[j]);
@@ -1651,7 +1643,7 @@ void CircleCollisionSIMD::update(const uint32_t& current_image)
 	const auto t3 = std::chrono::high_resolution_clock::now();
 	const auto detection = std::chrono::duration<double, std::milli>(t2 - t1).count();
 	const auto handle = std::chrono::duration<double, std::milli>(t3 - t2).count();
-	sprintf_s(title, "Wall Handle: %.8f(ms), Collision Handle: %.8f(ms)", detection, handle);
+	//sprintf_s(title, "Wall Handle: %.8f(ms), Collision Handle: %.8f(ms)", detection, handle);
 
 	if (draw)
 		draw = false;
@@ -1785,7 +1777,7 @@ bool CircleCollisionSIMD::main_loop()
 		{
 			this->last_fps = static_cast<uint32_t>((float)frame_counter * (1000.0f / fps_timer));
 
-			//sprintf_s(title, "%d FPS in %.8f (ms)", this->last_fps, this->frame_timer);
+			sprintf_s(title, "%d FPS in %.8f (ms)", this->last_fps, this->frame_timer);
 
 			sum_time += fps_timer;
 			count_frames += this->frame_counter;

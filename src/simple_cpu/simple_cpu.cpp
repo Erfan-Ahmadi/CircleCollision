@@ -5,11 +5,6 @@
 #include <algorithm>
 #include <stdio.h>
 
-#ifdef _WIN32
-#include <direct.h>
-#define GetCurrentDir _getcwd
-#endif
-
 #define VERTEX_BUFFER_BIND_ID				0 // PER VERTEX
 #define COLOR_BUFFER_BIND_ID				1 // PER INSTANCE
 #define POSITIONS_BUFFER_BIND_ID			2 // PER INSTANCE
@@ -66,10 +61,6 @@ void CircleCollisionSimple::initialize()
 {
 	srand(time(NULL));
 	validation_layers_enabled = false;
-	char current_path[FILENAME_MAX];
-	GetCurrentDir(current_path, sizeof(current_path));
-	current_path[sizeof(current_path) - 1] = '/0';
-	this->app_path = std::string(current_path);
 }
 
 bool CircleCollisionSimple::run()
@@ -658,8 +649,10 @@ bool CircleCollisionSimple::create_descriptor_set_layout()
 
 bool CircleCollisionSimple::create_graphics_pipeline()
 {
-	auto vert_shader = read_file(this->app_path + "\\..\\..\\..\\src\\simple_cpu\\shaders\\shaders.vert.spv");
-	auto frag_shader = read_file(this->app_path + "\\..\\..\\..\\src\\simple_cpu\\shaders\\shaders.frag.spv");
+	std::string path = files::get_app_path();
+
+	auto vert_shader = read_file(path + "\\..\\..\\..\\..\\..\\src\\simple_cpu\\shaders\\shaders.vert.spv");
+	auto frag_shader = read_file(path + "\\..\\..\\..\\..\\..\\src\\simple_cpu\\shaders\\shaders.frag.spv");
 
 	if (vert_shader.empty() || frag_shader.empty())
 	{

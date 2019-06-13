@@ -190,9 +190,6 @@ private:
 #ifdef _DEBUG
 	VkDebugUtilsMessengerEXT debug_messenger;
 #endif
-
-	std::string app_path;
-
 	//	Window
 	GLFWwindow* window;
 

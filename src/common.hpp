@@ -22,11 +22,11 @@
 
 typedef uint32_t size;
 
-constexpr int screen_width = 1600;
-constexpr int screen_height = 900;
+constexpr int screen_width = 1280;
+constexpr int screen_height = 720;
 
-constexpr size		instance_count = (1 << 13);
-constexpr float		relative_velocity = 1.1f;
+constexpr size		instance_count = 1 << 10;
+constexpr float		relative_velocity = 0.1f;
 constexpr float		relative_scale = 1.0f;
 
 constexpr bool mouse_bounding_enabled = false;
@@ -38,7 +38,8 @@ static int max_size = relative_scale * glm::sqrt((screen_width * screen_height) 
 static int min_size = max_size / 3;
 static const int max_collisions = 20;
 
-static char title[64];
+#define MAX_TITLE_CHARS 128
+static char title[MAX_TITLE_CHARS];
 
 #define log(str) std::cout << str << std::endl
 
@@ -51,6 +52,20 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
 	std::cerr << "validation layer: " << pCallbackData->pMessage << std::endl << std::endl;
 
 	return VK_FALSE;
+}
+
+namespace files
+{
+	static std::string get_app_path()
+	{
+		char current_path[FILENAME_MAX];
+#ifdef __linux__ 
+		// Get Linux File Path
+#elif _WIN32
+		GetModuleFileName(0, current_path, sizeof(current_path));
+#endif
+		return std::string(current_path);
+	}
 }
 
 namespace simd
@@ -69,7 +84,7 @@ namespace simd
 
 		return _mm256_permutevar8x32_ps(src, shufmask);
 	}
-	
+
 	inline __m256i pack_left_256_indices(const unsigned int& mask)
 	{
 		uint64_t expanded_mask = _pdep_u64(mask, 0x0101010101010101);

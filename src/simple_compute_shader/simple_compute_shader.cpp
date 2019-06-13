@@ -5,11 +5,6 @@
 #include <algorithm>
 #include <stdio.h>
 
-#ifdef _WIN32
-#include <direct.h>
-#define GetCurrentDir _getcwd
-#endif
-
 #define VERTEX_BUFFER_BIND_ID				0 // PER VERTEX
 #define COLOR_BUFFER_BIND_ID				1 // PER INSTANCE
 #define POSITIONS_BUFFER_BIND_ID			2 // PER INSTANCE
@@ -65,10 +60,6 @@ void CircleCollisionComputeShader::initialize()
 {
 	srand(time(NULL));
 	validation_layers_enabled = false;
-	char current_path[FILENAME_MAX];
-	GetCurrentDir(current_path, sizeof(current_path));
-	current_path[sizeof(current_path) - 1] = '/0';
-	this->app_path = std::string(current_path);
 }
 
 bool CircleCollisionComputeShader::run()
@@ -174,7 +165,7 @@ bool CircleCollisionComputeShader::create_instance()
 	// check if extentions required by glfw is available
 	if (required_validation_layers.size() > available_layer_count)
 	{
-		Log("Validation Layers Not Supported");
+		log("Validation Layers Not Supported");
 		return false;
 	}
 
@@ -190,7 +181,7 @@ bool CircleCollisionComputeShader::create_instance()
 
 		if (!found_layer)
 		{
-			Log("Validation Layer << " << required_validation_layers[i] << " >> is not available");
+			log("Validation Layer << " << required_validation_layers[i] << " >> is not available");
 			return false;
 		}
 	}
@@ -663,8 +654,10 @@ bool CircleCollisionComputeShader::create_descriptor_set_layout()
 
 bool CircleCollisionComputeShader::create_graphics_pipeline()
 {
-	auto vert_shader = read_file(this->app_path + "\\..\\..\\..\\src\\simple_compute_shader\\shaders\\shaders.vert.spv");
-	auto frag_shader = read_file(this->app_path + "\\..\\..\\..\\src\\simple_compute_shader\\shaders\\shaders.frag.spv");
+	std::string path = files::get_app_path();
+
+	auto vert_shader = read_file(path + "\\..\\..\\..\\..\\..\\src\\simple_compute_shader\\shaders\\shaders.vert.spv");
+	auto frag_shader = read_file(path + "\\..\\..\\..\\..\\..\\src\\simple_compute_shader\\shaders\\shaders.frag.spv");
 
 	if (vert_shader.empty() || frag_shader.empty())
 	{
@@ -1536,8 +1529,9 @@ bool CircleCollisionComputeShader::prepare_compute()
 
 	// Create Pipeline
 
-	// Load Compute Shader
-	auto comp_shader = read_file(this->app_path + "\\..\\..\\..\\src\\simple_compute_shader\\shaders\\shaders.comp.spv");
+	std::string path = files::get_app_path();
+
+	auto comp_shader = read_file(path + "\\..\\..\\..\\..\\..\\src\\simple_compute_shader\\shaders\\shaders.comp.spv");
 	VkShaderModule comp_shader_module = helper::create_shader_module(this->device, comp_shader);
 
 	VkPipelineShaderStageCreateInfo compute_shader = {};

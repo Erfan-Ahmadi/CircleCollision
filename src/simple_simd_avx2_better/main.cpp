@@ -3,7 +3,7 @@
 int main()
 {
 	CircleCollisionSIMD app;
-
+	
 	app.initialize();
 
 	if (!app.run())

@@ -24,8 +24,8 @@ const std::vector<const char*> device_extensions = {
 static int64_t sum_time = 0;
 static size_t count_frames = 0;
 
-constexpr size_t twos = instance_count * (instance_count - 1) / 2;
-constexpr size_t num_threads = 8;
+constexpr size_t num_pairs = instance_count * (instance_count - 1) / 2;
+constexpr size_t num_threads = 7;
 
 size_t max_is[num_threads + 1];
 size_t max_js[num_threads + 1];
@@ -1463,8 +1463,8 @@ bool CircleCollisionMultiThreaded::main_loop()
 	size_t all_sum = (instance_count * (instance_count - 1) / 2);
 	for (size_t k = 1; k <= num_threads; k++)
 	{
-		const size_t to_find = ((k == num_threads) ? twos : k * (twos / num_threads)) - 1;
-		size_t to_ff = twos - to_find - 1;
+		const size_t to_find = ((k == num_threads) ? num_pairs : k * (num_pairs / num_threads)) - 1;
+		size_t to_ff = num_pairs - to_find - 1;
 		size_t batch = 0;
 
 		for (size_t i = 1; i < instance_count + 1; ++i)

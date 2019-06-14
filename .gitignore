@@ -332,3 +332,10 @@ ASALocalRun/
 *.infoadvixe
 *.dflgadvixe
 /build/Visual Studio 2019/GPUCache
+/build/Visual Studio 2019/simple_multithread_stl/My Inspector Results - simple_multithread_stl
+/build/Visual Studio 2019/simple_multithread_stl/My Advisor Results - simple_multithread_stl
+/build/Visual Studio 2019/simple_compute_shader/VTune Amplifier Results/simple_compute_shader
+/build/Visual Studio 2019/simple_compute_shader/My Advisor Results - simple_compute_shader
+/build/Visual Studio 2019/simple_multithread_stl/VTune Amplifier Results/simple_multithread_stl
+/build/Visual Studio 2019/simple_simd_avx2_better/My Advisor Results - simple_simd_avx2_better
+/build/Visual Studio 2019/simple_cpu/My Advisor Results - circle_collision_simple

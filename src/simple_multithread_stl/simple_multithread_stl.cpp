@@ -24,6 +24,14 @@ const std::vector<const char*> device_extensions = {
 static int64_t sum_time = 0;
 static size_t count_frames = 0;
 
+constexpr size_t twos = instance_count * (instance_count - 1) / 2;
+constexpr size_t num_threads = 8;
+
+size_t max_is[num_threads + 1];
+size_t max_js[num_threads + 1];
+
+static bool should_close = false;
+
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
 	mouse_draw_radius += yoffset;
@@ -1299,48 +1307,45 @@ void CircleCollisionMultiThreaded::update(const uint32_t& current_image)
 		}
 	}
 
-	std::vector<std::pair<size_t, size_t>> collided;
+	//static size_t mini = max_is[0];
+	//static size_t maxi = max_is[1];
+	//static size_t minj = max_js[0];
+	//static size_t maxj = max_js[1];
 
-	for (size_t i = 0; i < instance_count; ++i)
-	{
-		for (size_t j = i + 1; j < instance_count; ++j)
-		{
-			const auto dx = this->circles.positions[i].x - this->circles.positions[j].x;
-			const auto dy = this->circles.positions[i].y - this->circles.positions[j].y;
-			const auto dis2 = (dy * dy + dx * dx);
-			const auto radii = this->circles.scales[i] + this->circles.scales[j];
+	//for (size_t i = mini; i <= maxi; ++i)
+	//{
+	//	const  size_t begin = (i == mini) ? minj + 1 : (i + 1);
+	//	const  size_t end = (i == maxi) ? maxj + 1 : instance_count;
+	//	for (size_t j = begin; j < end; ++j)
+	//	{
+	//		const auto dx = this->circles.positions[i].x - this->circles.positions[j].x;
+	//		const auto dy = this->circles.positions[i].y - this->circles.positions[j].y;
+	//		const auto dis2 = (dy * dy + dx * dx);
+	//		const auto radii = this->circles.scales[i] + this->circles.scales[j];
 
-			if (dis2 < radii * radii)
-			{
-				collided.push_back(std::pair<size_t, size_t>(i, j));
-			}
-		}
-	}
+	//		if (dis2 < radii * radii)
+	//		{
+	//			const auto dx = this->circles.positions[i].x - this->circles.positions[j].x;
+	//			const auto dy = this->circles.positions[i].y - this->circles.positions[j].y;
+	//			const auto radii = this->circles.scales[i] + this->circles.scales[j];
 
-	for (size_t k = 0; k < collided.size(); ++k)
-	{
-		int i = collided[k].first;
-		int j = collided[k].second;
+	//			// Move Away
+	//			const auto dis = glm::sqrt((dy * dy + dx * dx));
+	//			const auto n = glm::vec2(dx / dis, dy / dis);
+	//			const auto covered = radii - dis;
+	//			const auto move_vec = n * (covered / 2.0f);
+	//			this->circles.positions[i] += move_vec;
+	//			this->circles.positions[j] -= move_vec;
 
-		const auto dx = this->circles.positions[i].x - this->circles.positions[j].x;
-		const auto dy = this->circles.positions[i].y - this->circles.positions[j].y;
-		const auto radii = this->circles.scales[i] + this->circles.scales[j];
-
-		// Move Away
-		const auto dis = glm::sqrt((dy * dy + dx * dx));
-		const auto n = glm::vec2(dx / dis, dy / dis);
-		const auto covered = radii - dis;
-		const auto move_vec = n * (covered / 2.0f);
-		this->circles.positions[i] += move_vec;
-		this->circles.positions[j] -= move_vec;
-
-		// Change Velocity Direction
-		const auto m1 = this->circles.scales[i] * 5.0f;
-		const auto m2 = this->circles.scales[j] * 5.0f;
-		const auto p = 2 * (glm::dot(n, this->circles.velocities[i]) - glm::dot(n, this->circles.velocities[j])) / (m1 + m2);
-		this->circles.velocities[i] = (this->circles.velocities[i] - n * m2 * p);
-		this->circles.velocities[j] = (this->circles.velocities[j] + n * m1 * p);
-	}
+	//			// Change Velocity Direction
+	//			const auto m1 = this->circles.scales[i] * 5.0f;
+	//			const auto m2 = this->circles.scales[j] * 5.0f;
+	//			const auto p = 2 * (glm::dot(n, this->circles.velocities[i]) - glm::dot(n, this->circles.velocities[j])) / (m1 + m2);
+	//			this->circles.velocities[i] = (this->circles.velocities[i] - n * m2 * p);
+	//			this->circles.velocities[j] = (this->circles.velocities[j] + n * m1 * p);
+	//		}
+	//	}
+	//}
 
 	if (draw)
 		draw = false;
@@ -1451,6 +1456,84 @@ bool CircleCollisionMultiThreaded::main_loop()
 {
 	this->last_timestamp = std::chrono::high_resolution_clock::now();
 
+	// Post Proccessing
+	max_is[0] = 0;
+	max_js[0] = 0;
+
+	size_t all_sum = (instance_count * (instance_count - 1) / 2);
+	for (size_t k = 1; k <= num_threads; k++)
+	{
+		const size_t to_find = ((k == num_threads) ? twos : k * (twos / num_threads)) - 1;
+		size_t to_ff = twos - to_find - 1;
+		size_t batch = 0;
+
+		for (size_t i = 1; i < instance_count + 1; ++i)
+		{
+			int upper = ((i) * (i + 1)) / 2;
+
+			if (to_ff < upper)
+			{
+				int lower = ((i) * (i - 1)) / 2;
+				if (to_ff >= lower)
+				{
+					batch = instance_count - i - 1;
+					max_is[k] = batch;
+					max_js[k] = (upper - to_ff) + batch;
+					break;
+				}
+			}
+		}
+	}
+
+	// Dividing Job between Threads
+	this->thread_pool.resize(num_threads);
+	
+	using namespace std::chrono_literals;
+	for (size_t id = 0; id < num_threads; ++id)
+	{
+		thread_pool.add_job(id, [&, id](const size_t mini, const size_t maxi, const size_t minj, const size_t maxj)
+			{
+				while (!should_close)
+				{
+					for (size_t i = mini; i <= maxi; ++i)
+					{
+						const  size_t begin = (i == mini) ? minj + 1 : (i + 1);
+						const  size_t end = (i == maxi) ? maxj + 1 : instance_count;
+						for (size_t j = begin; j < end; ++j)
+						{
+							const auto dx = this->circles.positions[i].x - this->circles.positions[j].x;
+							const auto dy = this->circles.positions[i].y - this->circles.positions[j].y;
+							const auto dis2 = (dy * dy + dx * dx);
+							const auto radii = this->circles.scales[i] + this->circles.scales[j];
+
+							if (dis2 < radii * radii)
+							{
+								const auto dx = this->circles.positions[i].x - this->circles.positions[j].x;
+								const auto dy = this->circles.positions[i].y - this->circles.positions[j].y;
+								const auto radii = this->circles.scales[i] + this->circles.scales[j];
+
+								// Move Away
+								const auto dis = glm::sqrt((dy * dy + dx * dx));
+								const auto n = glm::vec2(dx / dis, dy / dis);
+								const auto covered = radii - dis;
+								const auto move_vec = n * (covered / 2.0f);
+								this->circles.positions[i] += move_vec;
+								this->circles.positions[j] -= move_vec;
+
+								// Change Velocity Direction
+								const auto m1 = this->circles.scales[i] * 5.0f;
+								const auto m2 = this->circles.scales[j] * 5.0f;
+								const auto p = 2 * (glm::dot(n, this->circles.velocities[i]) - glm::dot(n, this->circles.velocities[j])) / (m1 + m2);
+								this->circles.velocities[i] = (this->circles.velocities[i] - n * m2 * p);
+								this->circles.velocities[j] = (this->circles.velocities[j] + n * m1 * p);
+							}
+						}
+					}
+					std::this_thread::sleep_for(1ms);
+				}
+			}, max_is[id], max_is[id + 1], max_js[id], max_js[id + 1]);
+	}
+
 	while (!glfwWindowShouldClose(this->window))
 	{
 		const auto t_start = std::chrono::high_resolution_clock::now();
@@ -1488,10 +1571,11 @@ bool CircleCollisionMultiThreaded::main_loop()
 			std::cout << "Average Frame Time: " << (float)sum_time / count_frames << std::endl;
 			sum_time = 0;
 			count_frames = 0;
-			//return true;
 		}
-
 	}
+
+	should_close = true;
+	this->thread_pool.wait_for_threads();
 
 	return true;
 }

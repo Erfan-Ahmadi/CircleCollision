@@ -129,6 +129,7 @@
     <ClInclude Include="..\..\..\src\Renderer\renderer_helper.h" />
     <ClInclude Include="..\..\..\src\Renderer\vulkan_initializers.hpp" />
     <ClInclude Include="..\..\..\src\simple_multithread_stl\simple_multithread_stl.h" />
+    <ClInclude Include="..\..\..\src\simple_multithread_stl\thread_pool.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\Renderer\renderer_helper.cpp" />

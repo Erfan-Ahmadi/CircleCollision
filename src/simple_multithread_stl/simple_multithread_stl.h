@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../common.hpp"
+#include "thread_pool.hpp"
 #include <chrono>
 
 struct circles_strcut
@@ -18,7 +19,7 @@ struct circles_strcut
 		scales.resize(size);
 	}
 };
- 
+
 struct CircleCollisionMultiThreaded
 {
 public:
@@ -47,20 +48,20 @@ private:
 	bool create_renderpass();
 	bool create_descriptor_set_layout();
 	bool create_graphics_pipeline();
-	bool create_vertex_buffer(); //
-	bool create_index_buffer(); //
-	bool create_instance_buffers(); //
-	bool create_uniform_buffers(); //
+	bool create_vertex_buffer();
+	bool create_index_buffer();
+	bool create_instance_buffers();
+	bool create_uniform_buffers();
 	bool create_descriptor_pool();
 	bool create_descriptor_sets();
 	bool create_frame_buffers();
 	bool create_command_pool();
 	bool create_command_buffers();
 	bool create_sync_objects();
-	
-	bool create_colors_buffer(); //
-	bool create_positions_buffer(); //
-	bool create_scales_buffer(); // 
+
+	bool create_colors_buffer();
+	bool create_positions_buffer();
+	bool create_scales_buffer();
 
 	bool cleanup_swap_chain();
 	bool recreate_swap_chain();
@@ -71,7 +72,7 @@ private:
 	bool draw_frame();
 
 	bool main_loop();
-	
+
 	// Sample ----------------
 
 	renderer::model circle_model;
@@ -93,7 +94,7 @@ private:
 
 	VkBuffer scales_buffer;
 	VkDeviceMemory scales_buffer_memory;
-	
+
 	VkBuffer positions_buffer;
 	VkDeviceMemory positions_buffer_memory;
 
@@ -103,12 +104,13 @@ private:
 
 	VkPipelineLayout pipeline_layout;
 	VkPipeline graphics_pipeline;
-	
+
 	VkCommandPool command_pool;
 	std::vector<VkCommandBuffer> command_buffers;
 
-	// Sample ----------------
+	thread_pool thread_pool;
 
+	// Sample ----------------
 
 	//	Vulkan
 	VkInstance instance = VK_NULL_HANDLE;

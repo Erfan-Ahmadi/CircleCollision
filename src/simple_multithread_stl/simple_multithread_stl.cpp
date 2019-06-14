@@ -1307,46 +1307,6 @@ void CircleCollisionMultiThreaded::update(const uint32_t& current_image)
 		}
 	}
 
-	//static size_t mini = max_is[0];
-	//static size_t maxi = max_is[1];
-	//static size_t minj = max_js[0];
-	//static size_t maxj = max_js[1];
-
-	//for (size_t i = mini; i <= maxi; ++i)
-	//{
-	//	const  size_t begin = (i == mini) ? minj + 1 : (i + 1);
-	//	const  size_t end = (i == maxi) ? maxj + 1 : instance_count;
-	//	for (size_t j = begin; j < end; ++j)
-	//	{
-	//		const auto dx = this->circles.positions[i].x - this->circles.positions[j].x;
-	//		const auto dy = this->circles.positions[i].y - this->circles.positions[j].y;
-	//		const auto dis2 = (dy * dy + dx * dx);
-	//		const auto radii = this->circles.scales[i] + this->circles.scales[j];
-
-	//		if (dis2 < radii * radii)
-	//		{
-	//			const auto dx = this->circles.positions[i].x - this->circles.positions[j].x;
-	//			const auto dy = this->circles.positions[i].y - this->circles.positions[j].y;
-	//			const auto radii = this->circles.scales[i] + this->circles.scales[j];
-
-	//			// Move Away
-	//			const auto dis = glm::sqrt((dy * dy + dx * dx));
-	//			const auto n = glm::vec2(dx / dis, dy / dis);
-	//			const auto covered = radii - dis;
-	//			const auto move_vec = n * (covered / 2.0f);
-	//			this->circles.positions[i] += move_vec;
-	//			this->circles.positions[j] -= move_vec;
-
-	//			// Change Velocity Direction
-	//			const auto m1 = this->circles.scales[i] * 5.0f;
-	//			const auto m2 = this->circles.scales[j] * 5.0f;
-	//			const auto p = 2 * (glm::dot(n, this->circles.velocities[i]) - glm::dot(n, this->circles.velocities[j])) / (m1 + m2);
-	//			this->circles.velocities[i] = (this->circles.velocities[i] - n * m2 * p);
-	//			this->circles.velocities[j] = (this->circles.velocities[j] + n * m1 * p);
-	//		}
-	//	}
-	//}
-
 	if (draw)
 		draw = false;
 
@@ -1456,6 +1416,57 @@ bool CircleCollisionMultiThreaded::main_loop()
 {
 	this->last_timestamp = std::chrono::high_resolution_clock::now();
 
+	create_threads();
+
+	while (!glfwWindowShouldClose(this->window))
+	{
+		const auto t_start = std::chrono::high_resolution_clock::now();
+
+		if (!draw_frame())
+			return false;
+
+		const auto t_end = std::chrono::high_resolution_clock::now();
+		const auto t_diff = std::chrono::duration<double, std::milli>(t_end - t_start).count();
+
+		this->frame_counter++;
+		this->frame_timer = (float)t_diff;
+
+		float fps_timer = std::chrono::duration<double, std::milli>(t_end - this->last_timestamp).count();
+
+		if (fps_timer > 300.0f)
+		{
+			this->last_fps = static_cast<uint32_t>((float)frame_counter * (1000.0f / fps_timer));
+
+			sprintf_s(title, "%d FPS in %.8f (ms)", this->last_fps, this->frame_timer);
+
+			sum_time += fps_timer;
+			count_frames += this->frame_counter;
+
+			glfwSetWindowTitle(this->window, title);
+
+			this->frame_counter = 0;
+			this->last_timestamp = t_end;
+		}
+
+		glfwPollEvents();
+
+		if (count_frames > 500)
+		{
+			std::cout << "Average Frame Time: " << (float)sum_time / count_frames << std::endl;
+			sum_time = 0;
+			count_frames = 0;
+		}
+	}
+
+	should_close = true;
+	this->thread_pool.wait_for_threads();
+	this->thread_pool.release();
+
+	return true;
+}
+
+void CircleCollisionMultiThreaded::create_threads()
+{
 	// Post Proccessing
 	max_is[0] = 0;
 	max_js[0] = 0;
@@ -1533,51 +1544,6 @@ bool CircleCollisionMultiThreaded::main_loop()
 				}
 			}, max_is[id], max_is[id + 1], max_js[id], max_js[id + 1]);
 	}
-
-	while (!glfwWindowShouldClose(this->window))
-	{
-		const auto t_start = std::chrono::high_resolution_clock::now();
-
-		if (!draw_frame())
-			return false;
-
-		const auto t_end = std::chrono::high_resolution_clock::now();
-		const auto t_diff = std::chrono::duration<double, std::milli>(t_end - t_start).count();
-
-		this->frame_counter++;
-		this->frame_timer = (float)t_diff;
-
-		float fps_timer = std::chrono::duration<double, std::milli>(t_end - this->last_timestamp).count();
-
-		if (fps_timer > 300.0f)
-		{
-			this->last_fps = static_cast<uint32_t>((float)frame_counter * (1000.0f / fps_timer));
-
-			sprintf_s(title, "%d FPS in %.8f (ms)", this->last_fps, this->frame_timer);
-
-			sum_time += fps_timer;
-			count_frames += this->frame_counter;
-
-			glfwSetWindowTitle(this->window, title);
-
-			this->frame_counter = 0;
-			this->last_timestamp = t_end;
-		}
-
-		glfwPollEvents();
-
-		if (count_frames > 500)
-		{
-			std::cout << "Average Frame Time: " << (float)sum_time / count_frames << std::endl;
-			sum_time = 0;
-			count_frames = 0;
-		}
-	}
-
-	should_close = true;
-	this->thread_pool.wait_for_threads();
-
-	return true;
 }
 
 bool CircleCollisionMultiThreaded::release()

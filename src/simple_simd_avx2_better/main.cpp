@@ -2,7 +2,7 @@
 
 int main()
 {
-	CircleCollisionSIMD app;
+	CircleCollisionMultiThreadSIMD app;
 	
 	app.initialize();
 

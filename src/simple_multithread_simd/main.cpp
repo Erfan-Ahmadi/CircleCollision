@@ -1,9 +1,9 @@
-#include "simple_simd_avx2.h"
+#include "simple_multithread_simd.h"
 
 int main()
 {
 	CircleCollisionMultiThreadSIMD app;
-
+	
 	app.initialize();
 
 	if (!app.run())

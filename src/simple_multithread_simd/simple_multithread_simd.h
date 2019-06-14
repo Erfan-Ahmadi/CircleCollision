@@ -1,35 +1,48 @@
 #pragma once
 
 #include "../common.hpp"
+#include "../thread_pool.hpp"
 #include <chrono>
+
+constexpr size_t dividible_size = instance_count + 8 - ((instance_count) % 8);
+constexpr size_t vectors_size = dividible_size / 8;
 
 struct circles_strcut
 {
-	float*		x_positions;
-	float*		y_positions;
-	glm::vec2*	velocities;
-	glm::vec3*	colors;
-	float*		scales;
+	__m256* x_positions;
+	__m256* y_positions;
 
-	inline void resize(const size_t& size)
+	__m256* x_velocities;
+	__m256* y_velocities;
+
+	__m256* scales;
+
+	glm::vec3* colors;
+
+	inline void resize()
 	{
-		x_positions = static_cast<float*>(_aligned_malloc(sizeof(float) * size, alignof(float)));
-		y_positions = static_cast<float*>(_aligned_malloc(sizeof(float) * size, alignof(float)));
-		velocities	= static_cast<glm::vec2*>(malloc(sizeof(glm::vec2) * size));
-		colors		= static_cast<glm::vec3*>(malloc(sizeof(glm::vec3) * size));
-		scales		= static_cast<float*>(_aligned_malloc(sizeof(float) * size, alignof(float)));
+		x_positions = static_cast<__m256*>(_aligned_malloc(sizeof(__m256) * vectors_size, alignof(__m256)));
+		y_positions = static_cast<__m256*>(_aligned_malloc(sizeof(__m256) * vectors_size, alignof(__m256)));
+
+		x_velocities = static_cast<__m256*>(_aligned_malloc(sizeof(__m256) * vectors_size, alignof(__m256)));
+		y_velocities = static_cast<__m256*>(_aligned_malloc(sizeof(__m256) * vectors_size, alignof(__m256)));
+		
+		scales = static_cast<__m256*>(_aligned_malloc(sizeof(__m256) * vectors_size, alignof(__m256)));
+
+		colors = static_cast<glm::vec3*>(malloc(sizeof(glm::vec3) * instance_count));
 	}
 
 	void release()
 	{
 		_aligned_free(x_positions);
 		_aligned_free(y_positions);
-		free(velocities);
+		_aligned_free(x_velocities);
+		_aligned_free(y_velocities);
 		free(colors);
 		_aligned_free(scales);
 	}
 };
- 
+
 struct CircleCollisionMultiThreadSIMD
 {
 public:
@@ -68,7 +81,7 @@ private:
 	bool create_command_pool();
 	bool create_command_buffers();
 	bool create_sync_objects();
-	
+
 	bool create_colors_buffer(); //
 	bool create_positions_buffer(); //
 	bool create_scales_buffer(); // 
@@ -83,6 +96,8 @@ private:
 
 	bool main_loop();
 	
+	void create_threads();
+
 	// Sample ----------------
 	renderer::model circle_model;
 
@@ -103,10 +118,10 @@ private:
 
 	VkBuffer scales_buffer;
 	VkDeviceMemory scales_buffer_memory;
-	
+
 	VkBuffer x_positions_buffer;
 	VkDeviceMemory x_positions_buffer_memory;
-	
+
 	VkBuffer y_positions_buffer;
 	VkDeviceMemory y_positions_buffer_memory;
 
@@ -116,9 +131,11 @@ private:
 
 	VkPipelineLayout pipeline_layout;
 	VkPipeline graphics_pipeline;
-	
+
 	VkCommandPool command_pool;
 	std::vector<VkCommandBuffer> command_buffers;
+	
+	thread_pool thread_pool;
 
 	// Sample ----------------
 
@@ -164,7 +181,7 @@ private:
 #ifdef _DEBUG
 	VkDebugUtilsMessengerEXT debug_messenger;
 #endif
-	
+
 	//	Window
 	GLFWwindow* window;
 

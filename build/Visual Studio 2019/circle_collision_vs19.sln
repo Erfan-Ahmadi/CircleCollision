@@ -13,6 +13,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "simple_compute_shader", "si
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "simple_multithread_stl", "simple_multithread_stl\simple_multithread_stl.vcxproj", "{7BC28857-8196-4BF1-BB3A-060F688309C9}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "simple_multithread_simd", "simple_multithread_simd\simple_multithread_simd.vcxproj", "{1F7128FF-7696-4759-80B7-CB9C268DE0F1}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -61,6 +63,14 @@ Global
 		{7BC28857-8196-4BF1-BB3A-060F688309C9}.Release|x64.Build.0 = Release|x64
 		{7BC28857-8196-4BF1-BB3A-060F688309C9}.Release|x86.ActiveCfg = Release|Win32
 		{7BC28857-8196-4BF1-BB3A-060F688309C9}.Release|x86.Build.0 = Release|Win32
+		{1F7128FF-7696-4759-80B7-CB9C268DE0F1}.Debug|x64.ActiveCfg = Debug|x64
+		{1F7128FF-7696-4759-80B7-CB9C268DE0F1}.Debug|x64.Build.0 = Debug|x64
+		{1F7128FF-7696-4759-80B7-CB9C268DE0F1}.Debug|x86.ActiveCfg = Debug|Win32
+		{1F7128FF-7696-4759-80B7-CB9C268DE0F1}.Debug|x86.Build.0 = Debug|Win32
+		{1F7128FF-7696-4759-80B7-CB9C268DE0F1}.Release|x64.ActiveCfg = Release|x64
+		{1F7128FF-7696-4759-80B7-CB9C268DE0F1}.Release|x64.Build.0 = Release|x64
+		{1F7128FF-7696-4759-80B7-CB9C268DE0F1}.Release|x86.ActiveCfg = Release|Win32
+		{1F7128FF-7696-4759-80B7-CB9C268DE0F1}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

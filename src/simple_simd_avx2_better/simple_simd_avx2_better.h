@@ -42,7 +42,7 @@ struct circles_strcut
 	}
 };
 
-struct CircleCollisionSIMD
+struct CircleCollisionMultiThreadSIMD
 {
 public:
 	void initialize();

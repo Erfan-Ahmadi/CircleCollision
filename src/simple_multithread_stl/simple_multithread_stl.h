@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../common.hpp"
-#include "thread_pool.hpp"
+#include "../thread_pool.hpp"
 #include <chrono>
 
 struct circles_strcut
@@ -72,6 +72,8 @@ private:
 	bool draw_frame();
 
 	bool main_loop();
+
+	void create_threads();
 
 	// Sample ----------------
 

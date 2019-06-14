@@ -20,8 +20,8 @@
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
-    <ProjectGuid>{7BC28857-8196-4BF1-BB3A-060F688309C9}</ProjectGuid>
-    <RootNamespace>simplemultithreadstl</RootNamespace>
+    <ProjectGuid>{1F7128FF-7696-4759-80B7-CB9C268DE0F1}</ProjectGuid>
+    <RootNamespace>simplemultithreadsimd</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -128,13 +128,17 @@
     <ClInclude Include="..\..\..\src\common.hpp" />
     <ClInclude Include="..\..\..\src\Renderer\renderer_helper.h" />
     <ClInclude Include="..\..\..\src\Renderer\vulkan_initializers.hpp" />
-    <ClInclude Include="..\..\..\src\simple_multithread_stl\simple_multithread_stl.h" />
+    <ClInclude Include="..\..\..\src\simple_multithread_simd\simple_multithread_simd.h" />
     <ClInclude Include="..\..\..\src\thread_pool.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\Renderer\renderer_helper.cpp" />
-    <ClCompile Include="..\..\..\src\simple_multithread_stl\main.cpp" />
-    <ClCompile Include="..\..\..\src\simple_multithread_stl\simple_multithread_stl.cpp" />
+    <ClCompile Include="..\..\..\src\simple_multithread_simd\main.cpp" />
+    <ClCompile Include="..\..\..\src\simple_multithread_simd\simple_multithread_simd.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\..\src\simple_multithread_simd\shaders\shaders.frag" />
+    <None Include="..\..\..\src\simple_multithread_simd\shaders\shaders.vert" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

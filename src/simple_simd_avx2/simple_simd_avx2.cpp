@@ -40,7 +40,7 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 
 static void resize_callback(GLFWwindow* window, int width, int height)
 {
-	auto app = reinterpret_cast<CircleCollisionSIMD*>(glfwGetWindowUserPointer(window));
+	auto app = reinterpret_cast<CircleCollisionMultiThreadSIMD*>(glfwGetWindowUserPointer(window));
 	app->window_resize();
 }
 
@@ -63,13 +63,13 @@ static std::vector<char> read_file(const std::string& fileName)
 	return buffer;
 }
 
-void CircleCollisionSIMD::initialize()
+void CircleCollisionMultiThreadSIMD::initialize()
 {
 	srand(time(NULL));
 	validation_layers_enabled = false;
 }
 
-bool CircleCollisionSIMD::run()
+bool CircleCollisionMultiThreadSIMD::run()
 {
 	if (!setup_window())
 		return false;
@@ -86,7 +86,7 @@ bool CircleCollisionSIMD::run()
 	return true;
 }
 
-bool CircleCollisionSIMD::setup_window()
+bool CircleCollisionMultiThreadSIMD::setup_window()
 {
 	glfwInit();
 
@@ -101,7 +101,7 @@ bool CircleCollisionSIMD::setup_window()
 	return true;
 }
 
-bool CircleCollisionSIMD::setup_vulkan()
+bool CircleCollisionMultiThreadSIMD::setup_vulkan()
 {
 	if (!create_instance())
 		return false;
@@ -149,7 +149,7 @@ bool CircleCollisionSIMD::setup_vulkan()
 	return true;
 }
 
-bool CircleCollisionSIMD::create_instance()
+bool CircleCollisionMultiThreadSIMD::create_instance()
 {
 	VkApplicationInfo app_info = {};
 	app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -269,7 +269,7 @@ bool CircleCollisionSIMD::create_instance()
 	return result == VK_SUCCESS;
 }
 
-bool CircleCollisionSIMD::set_up_debug_messenger()
+bool CircleCollisionMultiThreadSIMD::set_up_debug_messenger()
 {
 #if defined(_DEBUG)
 	if (!validation_layers_enabled)
@@ -307,7 +307,7 @@ bool CircleCollisionSIMD::set_up_debug_messenger()
 #endif
 }
 
-bool CircleCollisionSIMD::pick_physical_device()
+bool CircleCollisionMultiThreadSIMD::pick_physical_device()
 {
 	uint32_t available_physical_devices_count = 0;
 	vkEnumeratePhysicalDevices(this->instance, &available_physical_devices_count, nullptr);
@@ -350,7 +350,7 @@ bool CircleCollisionSIMD::pick_physical_device()
 	return true;
 }
 
-bool CircleCollisionSIMD::check_device_extensions_support()
+bool CircleCollisionMultiThreadSIMD::check_device_extensions_support()
 {
 	uint32_t available_extensions_count;
 	vkEnumerateDeviceExtensionProperties(this->physical_device, nullptr, &available_extensions_count, nullptr);
@@ -365,7 +365,7 @@ bool CircleCollisionSIMD::check_device_extensions_support()
 	return required_extensions.empty();
 }
 
-bool CircleCollisionSIMD::create_logical_device()
+bool CircleCollisionMultiThreadSIMD::create_logical_device()
 {
 	if (!check_device_extensions_support())
 		return false;
@@ -416,12 +416,12 @@ bool CircleCollisionSIMD::create_logical_device()
 	return result == VK_SUCCESS;
 }
 
-bool CircleCollisionSIMD::create_surface()
+bool CircleCollisionMultiThreadSIMD::create_surface()
 {
 	return glfwCreateWindowSurface(this->instance, this->window, nullptr, &this->surface) == VK_SUCCESS;
 }
 
-bool CircleCollisionSIMD::create_swap_chain()
+bool CircleCollisionMultiThreadSIMD::create_swap_chain()
 {
 	// Get Properties
 
@@ -555,7 +555,7 @@ bool CircleCollisionSIMD::create_swap_chain()
 	return true;
 }
 
-bool CircleCollisionSIMD::create_image_views()
+bool CircleCollisionMultiThreadSIMD::create_image_views()
 {
 	this->swap_chain_image_views.resize(this->swap_chain_images.size());
 
@@ -583,7 +583,7 @@ bool CircleCollisionSIMD::create_image_views()
 	return true;
 }
 
-bool CircleCollisionSIMD::create_renderpass()
+bool CircleCollisionMultiThreadSIMD::create_renderpass()
 {
 	// Graphics Subpass
 	VkAttachmentReference color_attach_ref = {};
@@ -633,7 +633,7 @@ bool CircleCollisionSIMD::create_renderpass()
 	return true;
 }
 
-bool CircleCollisionSIMD::create_descriptor_set_layout()
+bool CircleCollisionMultiThreadSIMD::create_descriptor_set_layout()
 {
 	VkDescriptorSetLayoutBinding descriptor_set_binding = {};
 	descriptor_set_binding.binding = 0;
@@ -653,7 +653,7 @@ bool CircleCollisionSIMD::create_descriptor_set_layout()
 	return true;
 }
 
-bool CircleCollisionSIMD::create_graphics_pipeline()
+bool CircleCollisionMultiThreadSIMD::create_graphics_pipeline()
 {
 	std::string path = files::get_app_path();
 
@@ -828,7 +828,7 @@ bool CircleCollisionSIMD::create_graphics_pipeline()
 	return true;
 }
 
-bool CircleCollisionSIMD::create_vertex_buffer()
+bool CircleCollisionMultiThreadSIMD::create_vertex_buffer()
 {
 	get_circle_model(30, &this->circle_model);
 	const VkDeviceSize buffer_size = sizeof(vertex) * this->circle_model.vertices.size();
@@ -873,7 +873,7 @@ bool CircleCollisionSIMD::create_vertex_buffer()
 	return true;
 }
 
-bool CircleCollisionSIMD::create_index_buffer()
+bool CircleCollisionMultiThreadSIMD::create_index_buffer()
 {
 	const VkDeviceSize buffer_size = sizeof(uint16_t) * this->circle_model.indices.size();
 
@@ -917,7 +917,7 @@ bool CircleCollisionSIMD::create_index_buffer()
 	return true;
 }
 
-bool CircleCollisionSIMD::create_instance_buffers()
+bool CircleCollisionMultiThreadSIMD::create_instance_buffers()
 {
 	setup_circles();
 
@@ -931,7 +931,7 @@ bool CircleCollisionSIMD::create_instance_buffers()
 	return true;
 }
 
-bool CircleCollisionSIMD::create_uniform_buffers()
+bool CircleCollisionMultiThreadSIMD::create_uniform_buffers()
 {
 	const auto buffer_size = sizeof(UniformBufferObject);
 
@@ -957,7 +957,7 @@ bool CircleCollisionSIMD::create_uniform_buffers()
 	return true;
 }
 
-bool CircleCollisionSIMD::create_descriptor_pool()
+bool CircleCollisionMultiThreadSIMD::create_descriptor_pool()
 {
 	VkDescriptorPoolSize pool_size = {};
 	pool_size.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -977,7 +977,7 @@ bool CircleCollisionSIMD::create_descriptor_pool()
 	return true;
 }
 
-bool CircleCollisionSIMD::create_descriptor_sets()
+bool CircleCollisionMultiThreadSIMD::create_descriptor_sets()
 {
 	std::vector<VkDescriptorSetLayout> layouts(swap_chain_images.size(), ubo_descriptor_set_layout);
 
@@ -1012,7 +1012,7 @@ bool CircleCollisionSIMD::create_descriptor_sets()
 	}
 }
 
-bool CircleCollisionSIMD::create_frame_buffers()
+bool CircleCollisionMultiThreadSIMD::create_frame_buffers()
 {
 	this->swap_chain_frame_buffers.resize(this->swap_chain_image_views.size());
 
@@ -1042,7 +1042,7 @@ bool CircleCollisionSIMD::create_frame_buffers()
 	return true;
 }
 
-bool CircleCollisionSIMD::create_command_pool()
+bool CircleCollisionMultiThreadSIMD::create_command_pool()
 {
 	VkCommandPoolCreateInfo create_info = {};
 
@@ -1059,7 +1059,7 @@ bool CircleCollisionSIMD::create_command_pool()
 	return true;
 }
 
-bool CircleCollisionSIMD::create_command_buffers()
+bool CircleCollisionMultiThreadSIMD::create_command_buffers()
 {
 	this->command_buffers.resize(this->swap_chain_frame_buffers.size());
 
@@ -1140,7 +1140,7 @@ bool CircleCollisionSIMD::create_command_buffers()
 	return true;
 }
 
-bool CircleCollisionSIMD::create_sync_objects()
+bool CircleCollisionMultiThreadSIMD::create_sync_objects()
 {
 	this->num_frames = this->swap_chain_images.size();
 
@@ -1170,7 +1170,7 @@ bool CircleCollisionSIMD::create_sync_objects()
 	return true;
 }
 
-bool CircleCollisionSIMD::cleanup_swap_chain()
+bool CircleCollisionMultiThreadSIMD::cleanup_swap_chain()
 {
 	for (auto& frame_buffer : this->swap_chain_frame_buffers)
 		vkDestroyFramebuffer(this->device, frame_buffer, nullptr);
@@ -1195,7 +1195,7 @@ bool CircleCollisionSIMD::cleanup_swap_chain()
 	return true;
 }
 
-bool CircleCollisionSIMD::recreate_swap_chain()
+bool CircleCollisionMultiThreadSIMD::recreate_swap_chain()
 {
 	vkDeviceWaitIdle(this->device);
 
@@ -1231,7 +1231,7 @@ bool CircleCollisionSIMD::recreate_swap_chain()
 	return true;
 }
 
-bool CircleCollisionSIMD::set_viewport_scissor()
+bool CircleCollisionMultiThreadSIMD::set_viewport_scissor()
 {
 	this->viewport = {};
 	viewport.x = 0.0f;
@@ -1259,7 +1259,7 @@ inline void print_vec(V& vec)
 	std::cout << std::endl;
 }
 
-void CircleCollisionSIMD::update(const uint32_t& current_image)
+void CircleCollisionMultiThreadSIMD::update(const uint32_t& current_image)
 {
 	static auto start_time = std::chrono::high_resolution_clock::now();
 
@@ -1439,7 +1439,7 @@ void CircleCollisionSIMD::update(const uint32_t& current_image)
 	vkUnmapMemory(this->device, this->ubo_buffers_memory[current_image]);
 }
 
-bool CircleCollisionSIMD::draw_frame()
+bool CircleCollisionMultiThreadSIMD::draw_frame()
 {
 	vkWaitForFences(this->device, 1, &this->draw_fences[this->current_frame], VK_TRUE, std::numeric_limits<uint64_t>::max());
 
@@ -1525,7 +1525,7 @@ bool CircleCollisionSIMD::draw_frame()
 	return true;
 }
 
-bool CircleCollisionSIMD::main_loop()
+bool CircleCollisionMultiThreadSIMD::main_loop()
 {
 	this->last_timestamp = std::chrono::high_resolution_clock::now();
 
@@ -1574,7 +1574,7 @@ bool CircleCollisionSIMD::main_loop()
 	return true;
 }
 
-bool CircleCollisionSIMD::release()
+bool CircleCollisionMultiThreadSIMD::release()
 {
 	if (is_released)
 		return true;
@@ -1647,12 +1647,12 @@ bool CircleCollisionSIMD::release()
 	return true;
 }
 
-void CircleCollisionSIMD::window_resize()
+void CircleCollisionMultiThreadSIMD::window_resize()
 {
 	this->should_recreate_swapchain = true;
 }
 
-bool CircleCollisionSIMD::create_colors_buffer()
+bool CircleCollisionMultiThreadSIMD::create_colors_buffer()
 {
 	const VkDeviceSize buffer_size = sizeof(glm::vec3) * instance_count;
 
@@ -1676,7 +1676,7 @@ bool CircleCollisionSIMD::create_colors_buffer()
 	return true;
 }
 
-bool CircleCollisionSIMD::create_positions_buffer()
+bool CircleCollisionMultiThreadSIMD::create_positions_buffer()
 {
 	const VkDeviceSize buffer_size = sizeof(float) * instance_count;
 
@@ -1716,7 +1716,7 @@ bool CircleCollisionSIMD::create_positions_buffer()
 	return true;
 }
 
-bool CircleCollisionSIMD::create_scales_buffer()
+bool CircleCollisionMultiThreadSIMD::create_scales_buffer()
 {
 	const VkDeviceSize buffer_size = sizeof(float) * instance_count;
 
@@ -1760,7 +1760,7 @@ bool CircleCollisionSIMD::create_scales_buffer()
 	return true;
 }
 
-void CircleCollisionSIMD::setup_circles()
+void CircleCollisionMultiThreadSIMD::setup_circles()
 {
 	this->circles.resize(instance_count);
 

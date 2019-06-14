@@ -1,4 +1,4 @@
-#include "simple_simd_avx2_better.h"
+#include "simple_multithread_simd.h"
 
 #include <set>
 #include <fstream>
@@ -11,12 +11,22 @@
 #define YPOSITIONS_BUFFER_BIND_ID			3 // PER INSTANCE
 #define SCALE_BUFFER_BIND_ID				4 // PER INSTANCE
 
-#include <immintrin.h>
-
 static int64_t sum_time = 0;
 static size_t count_frames = 0;
 
+// Multi Threading Constants
+
+constexpr size_t num_pairs = vectors_size * (vectors_size - 1) / 2;
+constexpr size_t num_threads = 4; // Not Safe More than one thread for now
+static_assert(num_threads <= vectors_size);
+
+size_t max_is[num_threads + 1];
+size_t max_js[num_threads + 1];
+
+static bool should_close = false;
+
 // SIMD Constants
+
 #define SIMD
 
 static __m256 zero = _mm256_set1_ps(0);
@@ -163,7 +173,8 @@ const std::vector<const char*> required_validation_layers =
 	"VK_LAYER_LUNARG_standard_validation"
 };
 
-const std::vector<const char*> device_extensions = {
+const std::vector<const char*> device_extensions =
+{
 	VK_KHR_SWAPCHAIN_EXTENSION_NAME
 };
 
@@ -794,8 +805,8 @@ bool CircleCollisionMultiThreadSIMD::create_graphics_pipeline()
 {
 	std::string path = files::get_app_path();
 
-	auto vert_shader = read_file(path + "\\..\\..\\..\\..\\..\\src\\simple_simd_avx2_better\\shaders\\shaders.vert.spv");
-	auto frag_shader = read_file(path + "\\..\\..\\..\\..\\..\\src\\simple_simd_avx2_better\\shaders\\shaders.frag.spv");
+	auto vert_shader = read_file(path + "\\..\\..\\..\\..\\..\\src\\simple_multithread_simd\\shaders\\shaders.vert.spv");
+	auto frag_shader = read_file(path + "\\..\\..\\..\\..\\..\\src\\simple_multithread_simd\\shaders\\shaders.frag.spv");
 
 	if (vert_shader.empty() || frag_shader.empty())
 	{
@@ -1493,152 +1504,6 @@ void CircleCollisionMultiThreadSIMD::update(const uint32_t& current_image)
 	}
 	const auto t2 = std::chrono::high_resolution_clock::now();
 
-	for (size i = 0; i < vectors_size; ++i)
-	{
-		// Vector Self Checks
-		for (size j = 0; j < 4; ++j)
-		{
-			__m256& x1 = circles.x_positions[i];
-			__m256& y1 = circles.y_positions[i];
-			__m256& s1 = circles.scales[i];
-
-			const __m256 x2 = _mm256_permutevar8x32_ps(x1, self_check_rows[j]);
-			const __m256 y2 = _mm256_permutevar8x32_ps(y1, self_check_rows[j]);
-			const __m256 s2 = _mm256_permutevar8x32_ps(s1, self_check_rows[j]);
-
-			const __m256 dx = _mm256_sub_ps(x2, x1);
-			const __m256 dy = _mm256_sub_ps(y2, y1);
-			const __m256 ds = _mm256_sub_ps(s2, s1);
-
-			const __m256 dis2 = _mm256_fmadd_ps(dy, dy, _mm256_mul_ps(dx, dx));
-			const __m256 radii = _mm256_add_ps(s1, s2);
-			const __m256 radii2 = _mm256_mul_ps(radii, radii);
-
-			const __m256 compare = _mm256_cmp_ps(dis2, radii2, _CMP_LE_OQ);
-
-			if (_mm256_movemask_ps(compare) > 0)
-			{
-				// Move Away
-				const __m256 dis = _mm256_sqrt_ps(_mm256_fmadd_ps(dy, dy, _mm256_mul_ps(dx, dx)));
-				const __m256 covered_by_2 = _mm256_div_ps(_mm256_sub_ps(radii, dis), two);
-
-				// Perp Vec
-				const __m256 n_x = _mm256_div_ps(dx, dis);
-				const __m256 n_y = _mm256_div_ps(dy, dis);
-
-				const __m256 move_x = _mm256_blendv_ps(zero, _mm256_mul_ps(n_x, covered_by_2), compare);
-				const __m256 move_y = _mm256_blendv_ps(zero, _mm256_mul_ps(n_y, covered_by_2), compare);
-
-				circles.x_positions[i] = _mm256_sub_ps(x1, move_x);
-				circles.y_positions[i] = _mm256_sub_ps(y1, move_y);
-				circles.x_positions[i] = _mm256_add_ps(x1, _mm256_permutevar8x32_ps(move_x, reverse_self_check_rows[j]));
-				circles.y_positions[i] = _mm256_add_ps(y1, _mm256_permutevar8x32_ps(move_y, reverse_self_check_rows[j]));
-
-				// Change Velocity Direction
-
-				for (short h = 0; h < 8; ++h)
-				{
-					const __m256 cmp = _mm256_blendv_ps(zero, compare, identity_rows[h]);
-
-					if (_mm256_movemask_ps(cmp) == 0)
-						continue;
-
-					const __m256 v2_x = _mm256_permutevar8x32_ps(this->circles.x_velocities[i], self_check_rows[j]);
-					const __m256 v2_y = _mm256_permutevar8x32_ps(this->circles.y_velocities[i], self_check_rows[j]);
-
-					const __m256 m1 = _mm256_mul_ps(this->circles.scales[i], one);
-					const __m256 m2 = _mm256_mul_ps(s2, one);
-					const __m256 sum_mass = _mm256_add_ps(m1, m2);
-
-					const __m256 dot1 = _mm256_fmadd_ps(n_x, this->circles.x_velocities[i], _mm256_mul_ps(n_y, this->circles.y_velocities[i]));
-					const __m256 dot2 = _mm256_fmadd_ps(n_x, v2_x, _mm256_mul_ps(n_y, v2_y));
-
-					const __m256 p = _mm256_div_ps(_mm256_mul_ps(_mm256_sub_ps(dot1, dot2), two), sum_mass);
-
-					const __m256 mvel1_x = _mm256_blendv_ps(zero, _mm256_mul_ps(p, _mm256_mul_ps(m2, n_x)), cmp);
-					const __m256 mvel1_y = _mm256_blendv_ps(zero, _mm256_mul_ps(p, _mm256_mul_ps(m2, n_y)), cmp);
-					const __m256 mvel2_x = _mm256_blendv_ps(zero, _mm256_mul_ps(p, _mm256_mul_ps(m1, n_x)), cmp);
-					const __m256 mvel2_y = _mm256_blendv_ps(zero, _mm256_mul_ps(p, _mm256_mul_ps(m1, n_y)), cmp);
-
-					this->circles.x_velocities[i] = _mm256_sub_ps(this->circles.x_velocities[i], mvel1_x);
-					this->circles.y_velocities[i] = _mm256_sub_ps(this->circles.y_velocities[i], mvel1_y);
-
-					this->circles.x_velocities[i] = _mm256_add_ps(this->circles.x_velocities[i], _mm256_permutevar8x32_ps(mvel2_x, reverse_self_check_rows[j]));
-					this->circles.y_velocities[i] = _mm256_add_ps(this->circles.y_velocities[i], _mm256_permutevar8x32_ps(mvel2_y, reverse_self_check_rows[j]));
-				}
-			}
-		}
-
-		// Vector Other Checks
-		for (size j = i + 1; j < vectors_size; ++j)
-		{
-			for (size k = 0; k < 8; ++k)
-			{
-				const __m256 x1 = _mm256_permutevar8x32_ps(circles.x_positions[i], rows[k]);
-				const __m256 y1 = _mm256_permutevar8x32_ps(circles.y_positions[i], rows[k]);
-				const __m256 s1 = _mm256_permutevar8x32_ps(circles.scales[i], rows[k]);
-
-				const __m256 dx = _mm256_sub_ps(x1, circles.x_positions[j]);
-				const __m256 dy = _mm256_sub_ps(y1, circles.y_positions[j]);
-
-				const __m256 dis2 = _mm256_fmadd_ps(dy, dy, _mm256_fmadd_ps(dx, dx, zero));
-				const __m256 radii = _mm256_add_ps(circles.scales[j], s1);
-				const __m256 radii2 = _mm256_mul_ps(radii, radii);
-
-				const __m256 compare = _mm256_cmp_ps(dis2, radii2, _CMP_LE_OQ);
-
-				if (_mm256_movemask_ps(compare) > 0)
-				{
-					// Move Away
-					const __m256 dis = _mm256_sqrt_ps(_mm256_fmadd_ps(dy, dy, _mm256_mul_ps(dx, dx)));
-					const __m256 covered_by_2 = _mm256_div_ps(_mm256_sub_ps(radii, dis), two);
-
-					// Perp Vec
-					const __m256 n_x = _mm256_div_ps(dx, dis);
-					const __m256 n_y = _mm256_div_ps(dy, dis);
-
-					const __m256 move_x = _mm256_blendv_ps(zero, _mm256_mul_ps(n_x, covered_by_2), compare);
-					const __m256 move_y = _mm256_blendv_ps(zero, _mm256_mul_ps(n_y, covered_by_2), compare);
-
-					circles.x_positions[j] = _mm256_sub_ps(circles.x_positions[j], move_x);
-					circles.y_positions[j] = _mm256_sub_ps(circles.y_positions[j], move_y);
-					circles.x_positions[i] = _mm256_add_ps(circles.x_positions[i], _mm256_permutevar8x32_ps(move_x, reverse_rows[k]));
-					circles.y_positions[i] = _mm256_add_ps(circles.y_positions[i], _mm256_permutevar8x32_ps(move_y, reverse_rows[k]));
-
-					// Change Velocity Direction
-					const __m256 m1 = _mm256_mul_ps(s1, five);
-					const __m256 m2 = _mm256_mul_ps(this->circles.scales[j], five);
-					const __m256 sum_mass = _mm256_add_ps(m1, m2);
-
-					const __m256 v1_x = _mm256_permutevar8x32_ps(this->circles.x_velocities[i], rows[k]);
-					const __m256 v1_y = _mm256_permutevar8x32_ps(this->circles.y_velocities[i], rows[k]);
-
-					const __m256 dot1_x = _mm256_mul_ps(n_x, v1_x);
-					const __m256 dot1_y = _mm256_mul_ps(n_y, v1_y);
-					const __m256 dot1 = _mm256_add_ps(dot1_x, dot1_y);
-
-					const __m256 dot2_x = _mm256_mul_ps(n_x, this->circles.x_velocities[j]);
-					const __m256 dot2_y = _mm256_mul_ps(n_y, this->circles.y_velocities[j]);
-					const __m256 dot2 = _mm256_add_ps(dot2_x, dot2_y);
-
-					const __m256 p = _mm256_mul_ps(_mm256_div_ps(two, sum_mass), _mm256_sub_ps(dot1, dot2));
-
-					const __m256 mvel1_x = _mm256_blendv_ps(zero, _mm256_mul_ps(n_x, _mm256_mul_ps(m2, p)), compare);
-					const __m256 mvel1_y = _mm256_blendv_ps(zero, _mm256_mul_ps(n_y, _mm256_mul_ps(m2, p)), compare);
-					const __m256 mvel2_x = _mm256_blendv_ps(zero, _mm256_mul_ps(n_x, _mm256_mul_ps(m1, p)), compare);
-					const __m256 mvel2_y = _mm256_blendv_ps(zero, _mm256_mul_ps(n_y, _mm256_mul_ps(m1, p)), compare);
-
-					this->circles.x_velocities[i] = _mm256_sub_ps(this->circles.x_velocities[i], _mm256_permutevar8x32_ps(mvel1_x, reverse_rows[k]));
-					this->circles.y_velocities[i] = _mm256_sub_ps(this->circles.y_velocities[i], _mm256_permutevar8x32_ps(mvel1_y, reverse_rows[k]));
-
-					this->circles.x_velocities[j] = _mm256_add_ps(this->circles.x_velocities[j], mvel2_x);
-					this->circles.y_velocities[j] = _mm256_add_ps(this->circles.y_velocities[j], mvel2_y);
-				}
-			}
-
-		}
-	}
-
 	const auto t3 = std::chrono::high_resolution_clock::now();
 	const auto detection = std::chrono::duration<double, std::milli>(t2 - t1).count();
 	const auto handle = std::chrono::duration<double, std::milli>(t3 - t2).count();
@@ -1757,6 +1622,8 @@ bool CircleCollisionMultiThreadSIMD::main_loop()
 {
 	this->last_timestamp = std::chrono::high_resolution_clock::now();
 
+	create_threads();
+
 	while (!glfwWindowShouldClose(this->window))
 	{
 		const auto t_start = std::chrono::high_resolution_clock::now();
@@ -1794,12 +1661,207 @@ bool CircleCollisionMultiThreadSIMD::main_loop()
 			std::cout << "Average Frame Time: " << (float)sum_time / count_frames << std::endl;
 			sum_time = 0;
 			count_frames = 0;
-			//return true;
 		}
 
 	}
 
+	should_close = true;
+	this->thread_pool.wait_for_threads();
+	this->thread_pool.release();
+
 	return true;
+}
+
+void CircleCollisionMultiThreadSIMD::create_threads()
+{	// Post Proccessing
+	max_is[0] = 0;
+	max_js[0] = 0;
+
+	size_t all_sum = (vectors_size * (vectors_size - 1) / 2);
+	for (size_t k = 1; k <= num_threads; k++)
+	{
+		const size_t to_find = ((k == num_threads) ? num_pairs : k * (num_pairs / num_threads)) - 1;
+		size_t to_ff = num_pairs - to_find - 1;
+		size_t batch = 0;
+
+		for (size_t i = 1; i < vectors_size + 1; ++i)
+		{
+			int upper = ((i) * (i + 1)) / 2;
+
+			if (to_ff < upper)
+			{
+				int lower = ((i) * (i - 1)) / 2;
+				if (to_ff >= lower)
+				{
+					batch = vectors_size - i - 1;
+					max_is[k] = batch;
+					max_js[k] = (upper - to_ff) + batch;
+					break;
+				}
+			}
+		}
+	}
+
+	// Dividing Job between Threads
+	this->thread_pool.resize(num_threads);
+
+	using namespace std::chrono_literals;
+	for (size_t id = 0; id < num_threads; ++id)
+	{
+		thread_pool.add_job(id, [&, id](const size_t mini, const size_t maxi, const size_t minj, const size_t maxj)
+			{
+				while (!should_close)
+				{
+					for (size_t i = mini; i <= maxi; ++i)
+					{
+						// Vector Self Checks
+						for (size j = 0; j < 4; ++j)
+						{
+							__m256& x1 = circles.x_positions[i];
+							__m256& y1 = circles.y_positions[i];
+							__m256& s1 = circles.scales[i];
+
+							const __m256 x2 = _mm256_permutevar8x32_ps(x1, self_check_rows[j]);
+							const __m256 y2 = _mm256_permutevar8x32_ps(y1, self_check_rows[j]);
+							const __m256 s2 = _mm256_permutevar8x32_ps(s1, self_check_rows[j]);
+
+							const __m256 dx = _mm256_sub_ps(x2, x1);
+							const __m256 dy = _mm256_sub_ps(y2, y1);
+							const __m256 ds = _mm256_sub_ps(s2, s1);
+
+							const __m256 dis2 = _mm256_fmadd_ps(dy, dy, _mm256_mul_ps(dx, dx));
+							const __m256 radii = _mm256_add_ps(s1, s2);
+							const __m256 radii2 = _mm256_mul_ps(radii, radii);
+
+							const __m256 compare = _mm256_cmp_ps(dis2, radii2, _CMP_LE_OQ);
+
+							if (_mm256_movemask_ps(compare) > 0)
+							{
+								// Move Away
+								const __m256 dis = _mm256_sqrt_ps(_mm256_fmadd_ps(dy, dy, _mm256_mul_ps(dx, dx)));
+								const __m256 covered_by_2 = _mm256_div_ps(_mm256_sub_ps(radii, dis), two);
+
+								// Perp Vec
+								const __m256 n_x = _mm256_div_ps(dx, dis);
+								const __m256 n_y = _mm256_div_ps(dy, dis);
+
+								const __m256 move_x = _mm256_blendv_ps(zero, _mm256_mul_ps(n_x, covered_by_2), compare);
+								const __m256 move_y = _mm256_blendv_ps(zero, _mm256_mul_ps(n_y, covered_by_2), compare);
+
+								circles.x_positions[i] = _mm256_sub_ps(x1, move_x);
+								circles.y_positions[i] = _mm256_sub_ps(y1, move_y);
+								circles.x_positions[i] = _mm256_add_ps(x1, _mm256_permutevar8x32_ps(move_x, reverse_self_check_rows[j]));
+								circles.y_positions[i] = _mm256_add_ps(y1, _mm256_permutevar8x32_ps(move_y, reverse_self_check_rows[j]));
+
+								// Change Velocity Direction
+
+								for (short h = 0; h < 8; ++h)
+								{
+									const __m256 cmp = _mm256_blendv_ps(zero, compare, identity_rows[h]);
+
+									if (_mm256_movemask_ps(cmp) == 0)
+										continue;
+
+									const __m256 v2_x = _mm256_permutevar8x32_ps(this->circles.x_velocities[i], self_check_rows[j]);
+									const __m256 v2_y = _mm256_permutevar8x32_ps(this->circles.y_velocities[i], self_check_rows[j]);
+
+									const __m256 m1 = _mm256_mul_ps(this->circles.scales[i], one);
+									const __m256 m2 = _mm256_mul_ps(s2, one);
+									const __m256 sum_mass = _mm256_add_ps(m1, m2);
+
+									const __m256 dot1 = _mm256_fmadd_ps(n_x, this->circles.x_velocities[i], _mm256_mul_ps(n_y, this->circles.y_velocities[i]));
+									const __m256 dot2 = _mm256_fmadd_ps(n_x, v2_x, _mm256_mul_ps(n_y, v2_y));
+
+									const __m256 p = _mm256_div_ps(_mm256_mul_ps(_mm256_sub_ps(dot1, dot2), two), sum_mass);
+
+									const __m256 mvel1_x = _mm256_blendv_ps(zero, _mm256_mul_ps(p, _mm256_mul_ps(m2, n_x)), cmp);
+									const __m256 mvel1_y = _mm256_blendv_ps(zero, _mm256_mul_ps(p, _mm256_mul_ps(m2, n_y)), cmp);
+									const __m256 mvel2_x = _mm256_blendv_ps(zero, _mm256_mul_ps(p, _mm256_mul_ps(m1, n_x)), cmp);
+									const __m256 mvel2_y = _mm256_blendv_ps(zero, _mm256_mul_ps(p, _mm256_mul_ps(m1, n_y)), cmp);
+
+									this->circles.x_velocities[i] = _mm256_sub_ps(this->circles.x_velocities[i], mvel1_x);
+									this->circles.y_velocities[i] = _mm256_sub_ps(this->circles.y_velocities[i], mvel1_y);
+
+									this->circles.x_velocities[i] = _mm256_add_ps(this->circles.x_velocities[i], _mm256_permutevar8x32_ps(mvel2_x, reverse_self_check_rows[j]));
+									this->circles.y_velocities[i] = _mm256_add_ps(this->circles.y_velocities[i], _mm256_permutevar8x32_ps(mvel2_y, reverse_self_check_rows[j]));
+								}
+							}
+						}
+
+						// Vector Other Checks 
+						const  size_t begin = (i == mini) ? minj + 1 : (i + 1);
+						const  size_t end = (i == maxi) ? maxj + 1 : vectors_size;
+						for (size_t j = begin; j < end; ++j)
+						{
+							for (size k = 0; k < 8; ++k)
+							{
+								const __m256 x1 = _mm256_permutevar8x32_ps(circles.x_positions[i], rows[k]);
+								const __m256 y1 = _mm256_permutevar8x32_ps(circles.y_positions[i], rows[k]);
+								const __m256 s1 = _mm256_permutevar8x32_ps(circles.scales[i], rows[k]);
+
+								const __m256 dx = _mm256_sub_ps(x1, circles.x_positions[j]);
+								const __m256 dy = _mm256_sub_ps(y1, circles.y_positions[j]);
+
+								const __m256 dis2 = _mm256_fmadd_ps(dy, dy, _mm256_fmadd_ps(dx, dx, zero));
+								const __m256 radii = _mm256_add_ps(circles.scales[j], s1);
+								const __m256 radii2 = _mm256_mul_ps(radii, radii);
+
+								const __m256 compare = _mm256_cmp_ps(dis2, radii2, _CMP_LE_OQ);
+
+								if (_mm256_movemask_ps(compare) > 0)
+								{
+									// Move Away
+									const __m256 dis = _mm256_sqrt_ps(_mm256_fmadd_ps(dy, dy, _mm256_mul_ps(dx, dx)));
+									const __m256 covered_by_2 = _mm256_div_ps(_mm256_sub_ps(radii, dis), two);
+
+									// Perp Vec
+									const __m256 n_x = _mm256_div_ps(dx, dis);
+									const __m256 n_y = _mm256_div_ps(dy, dis);
+
+									const __m256 move_x = _mm256_blendv_ps(zero, _mm256_mul_ps(n_x, covered_by_2), compare);
+									const __m256 move_y = _mm256_blendv_ps(zero, _mm256_mul_ps(n_y, covered_by_2), compare);
+
+									circles.x_positions[j] = _mm256_sub_ps(circles.x_positions[j], move_x);
+									circles.y_positions[j] = _mm256_sub_ps(circles.y_positions[j], move_y);
+									circles.x_positions[i] = _mm256_add_ps(circles.x_positions[i], _mm256_permutevar8x32_ps(move_x, reverse_rows[k]));
+									circles.y_positions[i] = _mm256_add_ps(circles.y_positions[i], _mm256_permutevar8x32_ps(move_y, reverse_rows[k]));
+
+									// Change Velocity Direction
+									const __m256 m1 = _mm256_mul_ps(s1, five);
+									const __m256 m2 = _mm256_mul_ps(this->circles.scales[j], five);
+									const __m256 sum_mass = _mm256_add_ps(m1, m2);
+
+									const __m256 v1_x = _mm256_permutevar8x32_ps(this->circles.x_velocities[i], rows[k]);
+									const __m256 v1_y = _mm256_permutevar8x32_ps(this->circles.y_velocities[i], rows[k]);
+
+									const __m256 dot1_x = _mm256_mul_ps(n_x, v1_x);
+									const __m256 dot1_y = _mm256_mul_ps(n_y, v1_y);
+									const __m256 dot1 = _mm256_add_ps(dot1_x, dot1_y);
+
+									const __m256 dot2_x = _mm256_mul_ps(n_x, this->circles.x_velocities[j]);
+									const __m256 dot2_y = _mm256_mul_ps(n_y, this->circles.y_velocities[j]);
+									const __m256 dot2 = _mm256_add_ps(dot2_x, dot2_y);
+
+									const __m256 p = _mm256_mul_ps(_mm256_div_ps(two, sum_mass), _mm256_sub_ps(dot1, dot2));
+
+									const __m256 mvel1_x = _mm256_blendv_ps(zero, _mm256_mul_ps(n_x, _mm256_mul_ps(m2, p)), compare);
+									const __m256 mvel1_y = _mm256_blendv_ps(zero, _mm256_mul_ps(n_y, _mm256_mul_ps(m2, p)), compare);
+									const __m256 mvel2_x = _mm256_blendv_ps(zero, _mm256_mul_ps(n_x, _mm256_mul_ps(m1, p)), compare);
+									const __m256 mvel2_y = _mm256_blendv_ps(zero, _mm256_mul_ps(n_y, _mm256_mul_ps(m1, p)), compare);
+
+									this->circles.x_velocities[i] = _mm256_sub_ps(this->circles.x_velocities[i], _mm256_permutevar8x32_ps(mvel1_x, reverse_rows[k]));
+									this->circles.y_velocities[i] = _mm256_sub_ps(this->circles.y_velocities[i], _mm256_permutevar8x32_ps(mvel1_y, reverse_rows[k]));
+
+									this->circles.x_velocities[j] = _mm256_add_ps(this->circles.x_velocities[j], mvel2_x);
+									this->circles.y_velocities[j] = _mm256_add_ps(this->circles.y_velocities[j], mvel2_y);
+								}
+							}
+						}
+					}
+					std::this_thread::sleep_for(1ms);
+				}
+			}, max_is[id], max_is[id + 1], max_js[id], max_js[id + 1]);
+	}
 }
 
 bool CircleCollisionMultiThreadSIMD::release()
@@ -1858,7 +1920,7 @@ bool CircleCollisionMultiThreadSIMD::release()
 
 		// Destroy Device
 		vkDestroyDevice(this->device, nullptr);
-	}
+}
 
 	if (this->instance)
 	{

@@ -4,6 +4,9 @@
 #include <fstream>
 #include <algorithm>
 #include <stdio.h>
+#include <mutex>
+#include <condition_variable>
+#include <atomic>
 
 #define VERTEX_BUFFER_BIND_ID				0 // PER VERTEX
 #define COLOR_BUFFER_BIND_ID				1 // PER INSTANCE
@@ -25,12 +28,30 @@ static int64_t sum_time = 0;
 static size_t count_frames = 0;
 
 constexpr size_t num_pairs = instance_count * (instance_count - 1) / 2;
-constexpr size_t num_threads = 7;
 
+// Multi Threaded Synchronizations
+
+constexpr size_t num_threads = 7;
+static_assert(num_threads <= num_pairs);
+
+// For Dividing Equal Work(Check of Pairs) on each thread
 size_t max_is[num_threads + 1];
 size_t max_js[num_threads + 1];
 
-static bool should_close = false;
+std::mutex							collided_mutex;
+std::vector<std::pair<size, size>>	collided;
+
+using namespace std::chrono_literals;
+
+namespace sync
+{
+	static std::atomic<bool> should_close = false;
+
+	std::mutex					num_finished_mutex;
+	std::atomic<size>			num_finished = num_threads;
+
+	std::atomic<bool>			should_start[num_threads];
+}
 
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
@@ -68,6 +89,7 @@ static std::vector<char> read_file(const std::string& fileName)
 void CircleCollisionMultiThreaded::initialize()
 {
 	srand(time(NULL));
+	collided = std::vector<std::pair<size, size>>();
 	validation_layers_enabled = false;
 }
 
@@ -1245,6 +1267,8 @@ bool CircleCollisionMultiThreaded::set_viewport_scissor()
 	return true;
 }
 
+std::mutex cout_lock;
+
 void CircleCollisionMultiThreaded::update(const uint32_t& current_image)
 {
 	static auto start_time = std::chrono::high_resolution_clock::now();
@@ -1271,6 +1295,19 @@ void CircleCollisionMultiThreaded::update(const uint32_t& current_image)
 
 	const auto right_wall = (mouse_bounding_enabled && draw) ? mouse_pos.x : screen_width;
 	const auto bottom_wall = (mouse_bounding_enabled && draw) ? mouse_pos.y : screen_height;
+	
+	{
+		std::unique_lock<std::mutex> lock(collided_mutex);
+		collided.clear();
+	}
+
+	// Signal Collision Detection Threads to Start
+	{
+		for (size_t i = 0; i < num_threads; ++i)
+		{
+			sync::should_start[i] = true;
+		}
+	}
 
 	for (size_t i = 0; i < instance_count; ++i)
 	{
@@ -1305,6 +1342,41 @@ void CircleCollisionMultiThreaded::update(const uint32_t& current_image)
 			this->circles.positions[i].x = right_wall - this->circles.scales[i];
 			this->circles.velocities[i].x *= -1;
 		}
+	}
+	
+	// Wait For Collision Detection Work
+	while (sync::num_finished.load() < num_threads)
+	{
+		if (sync::should_close)
+			break;
+		//std::this_thread::sleep_for(1ms);
+	}
+
+	sync::num_finished = 0;
+
+	for (size_t k = 0; k < collided.size(); ++k)
+	{
+		int i = collided[k].first;
+		int j = collided[k].second;
+
+		const auto dx = this->circles.positions[i].x - this->circles.positions[j].x;
+		const auto dy = this->circles.positions[i].y - this->circles.positions[j].y;
+		const auto radii = this->circles.scales[i] + this->circles.scales[j];
+
+		// Move Away
+		const auto dis = glm::sqrt((dy * dy + dx * dx));
+		const auto n = glm::vec2(dx / dis, dy / dis);
+		const auto covered = radii - dis;
+		const auto move_vec = n * (covered / 2.0f);
+		this->circles.positions[i] += move_vec;
+		this->circles.positions[j] -= move_vec;
+
+		// Change Velocity Direction
+		const auto m1 = this->circles.scales[i] * 5.0f;
+		const auto m2 = this->circles.scales[j] * 5.0f;
+		const auto p = 2 * (glm::dot(n, this->circles.velocities[i]) - glm::dot(n, this->circles.velocities[j])) / (m1 + m2);
+		this->circles.velocities[i] = (this->circles.velocities[i] - n * m2 * p);
+		this->circles.velocities[j] = (this->circles.velocities[j] + n * m1 * p);
 	}
 
 	if (draw)
@@ -1458,7 +1530,8 @@ bool CircleCollisionMultiThreaded::main_loop()
 		}
 	}
 
-	should_close = true;
+	// Join and Finish threads
+	sync::should_close = true;
 	this->thread_pool.wait_for_threads();
 	this->thread_pool.release();
 
@@ -1467,6 +1540,8 @@ bool CircleCollisionMultiThreaded::main_loop()
 
 void CircleCollisionMultiThreaded::create_threads()
 {
+	sync::should_close.store(false);
+
 	// Post Proccessing
 	max_is[0] = 0;
 	max_js[0] = 0;
@@ -1498,14 +1573,23 @@ void CircleCollisionMultiThreaded::create_threads()
 
 	// Dividing Job between Threads
 	this->thread_pool.resize(num_threads);
-	
-	using namespace std::chrono_literals;
+
 	for (size_t id = 0; id < num_threads; ++id)
 	{
 		thread_pool.add_job(id, [&, id](const size_t mini, const size_t maxi, const size_t minj, const size_t maxj)
 			{
-				while (!should_close)
+				std::vector<std::pair<size_t, size_t>>	collided_local;
+
+				while (!sync::should_close)
 				{
+					while (!sync::should_start[id].load())
+					{
+						if (sync::should_close)
+							break;
+						std::this_thread::sleep_for(1ms);
+					}
+					sync::should_start[id] = false;
+
 					for (size_t i = mini; i <= maxi; ++i)
 					{
 						const  size_t begin = (i == mini) ? minj + 1 : (i + 1);
@@ -1519,29 +1603,23 @@ void CircleCollisionMultiThreaded::create_threads()
 
 							if (dis2 < radii * radii)
 							{
-								const auto dx = this->circles.positions[i].x - this->circles.positions[j].x;
-								const auto dy = this->circles.positions[i].y - this->circles.positions[j].y;
-								const auto radii = this->circles.scales[i] + this->circles.scales[j];
-
-								// Move Away
-								const auto dis = glm::sqrt((dy * dy + dx * dx));
-								const auto n = glm::vec2(dx / dis, dy / dis);
-								const auto covered = radii - dis;
-								const auto move_vec = n * (covered / 2.0f);
-								this->circles.positions[i] += move_vec;
-								this->circles.positions[j] -= move_vec;
-
-								// Change Velocity Direction
-								const auto m1 = this->circles.scales[i] * 5.0f;
-								const auto m2 = this->circles.scales[j] * 5.0f;
-								const auto p = 2 * (glm::dot(n, this->circles.velocities[i]) - glm::dot(n, this->circles.velocities[j])) / (m1 + m2);
-								this->circles.velocities[i] = (this->circles.velocities[i] - n * m2 * p);
-								this->circles.velocities[j] = (this->circles.velocities[j] + n * m1 * p);
+								collided_local.push_back(std::pair<size, size>(i, j));
 							}
 						}
 					}
-					std::this_thread::sleep_for(1ms);
+
+					// Add local colls to collisions vector
+					if (!collided_local.empty())
+					{
+						std::lock_guard<std::mutex> lock(collided_mutex);
+						collided.insert(collided.begin(), collided_local.begin(), collided_local.end());
+					}
+
+					collided_local.clear();
+
+					++sync::num_finished;
 				}
+
 			}, max_is[id], max_is[id + 1], max_js[id], max_js[id + 1]);
 	}
 }

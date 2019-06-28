@@ -35,8 +35,8 @@ constexpr size_t num_threads = 7;
 static_assert(num_threads <= num_pairs);
 
 // For Dividing Equal Work(Check of Pairs) on each thread
-size_t max_is[num_threads + 1];
-size_t max_js[num_threads + 1];
+size_t checks_i[num_threads + 1];
+size_t checks_j[num_threads + 1];
 
 std::mutex							collided_mutex;
 std::vector<std::pair<size, size>>	collided;
@@ -1543,8 +1543,8 @@ void CircleCollisionMultiThreaded::create_threads()
 	sync::should_close.store(false);
 
 	// Post Proccessing
-	max_is[0] = 0;
-	max_js[0] = 0;
+	checks_i[0] = 0;
+	checks_j[0] = 0;
 
 	size_t all_sum = (instance_count * (instance_count - 1) / 2);
 	for (size_t k = 1; k <= num_threads; k++)
@@ -1563,8 +1563,8 @@ void CircleCollisionMultiThreaded::create_threads()
 				if (to_ff >= lower)
 				{
 					batch = instance_count - i - 1;
-					max_is[k] = batch;
-					max_js[k] = (upper - to_ff) + batch;
+					checks_i[k] = batch;
+					checks_j[k] = (upper - to_ff) + batch;
 					break;
 				}
 			}
@@ -1620,7 +1620,7 @@ void CircleCollisionMultiThreaded::create_threads()
 					++sync::num_finished;
 				}
 
-			}, max_is[id], max_is[id + 1], max_js[id], max_js[id + 1]);
+			}, checks_i[id], checks_i[id + 1], checks_j[id], checks_j[id + 1]);
 	}
 }
 

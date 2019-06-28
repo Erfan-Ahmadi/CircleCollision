@@ -70,7 +70,7 @@ This Project Is For Learning Purposes of Following Topics
       - [x] [Load/Store Same Simple Data Structure and Calculate](https://github.com/Erfan-Ahmadi/CircleCollision/tree/master/src/simple_simd_avx2)
       - [x] [All SIMD Data Strcuture](https://github.com/Erfan-Ahmadi/CircleCollision/tree/master/src/simple_simd_avx2_better)
   - [x] [Multi-Threaded](https://github.com/Erfan-Ahmadi/CircleCollision/tree/master/src/simple_multithread_stl)
-  - [ ] **Multi-Threaded + SIMD**
+  - [x] **Multi-Threaded + SIMD**
 
 # Build
 - [**Visual Studio 2019**](https://github.com/Erfan-Ahmadi/CircleCollision/tree/master/build/Visual%20Studio%202019) 

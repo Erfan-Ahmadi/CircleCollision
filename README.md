@@ -71,6 +71,9 @@ This Project Is For Learning Purposes of Following Topics
       - [x] [All SIMD Data Strcuture](https://github.com/Erfan-Ahmadi/CircleCollision/tree/master/src/simple_simd_avx2_better)
   - [x] [Multi-Threaded](https://github.com/Erfan-Ahmadi/CircleCollision/tree/master/src/simple_multithread_stl)
   - [x] [**Multi-Threaded + SIMD**](https://github.com/Erfan-Ahmadi/CircleCollision/tree/master/build/Visual%20Studio%202019/simple_multithread_simd)
+- Spatial Partitioning
+  - Grid
+    - [x] [CPU](https://github.com/Erfan-Ahmadi/CircleCollision/tree/master/build/Visual%20Studio%202019/simple_cpu_grid_partitioning)
 
 # Build
 - [**Visual Studio 2019**](https://github.com/Erfan-Ahmadi/CircleCollision/tree/master/build/Visual%20Studio%202019) 

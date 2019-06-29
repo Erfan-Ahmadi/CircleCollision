@@ -19,8 +19,8 @@ typedef uint32_t size;
 constexpr int screen_width = 1280;
 constexpr int screen_height = 720;
 
-constexpr size		instance_count = 1 << 15;
-constexpr float		relative_velocity = 0.1f;
+constexpr size		instance_count = 1 << 14;
+constexpr float		relative_velocity = 0.5f;
 constexpr float		relative_scale = 1.0f;
 
 constexpr bool mouse_bounding_enabled = false;

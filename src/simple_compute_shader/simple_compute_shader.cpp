@@ -23,6 +23,9 @@ const std::vector<const char*> device_extensions = {
 	VK_KHR_SWAPCHAIN_EXTENSION_NAME
 };
 
+static float sum_time = 0;
+static size_t count_frames = 0;
+
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
 	mouse_draw_radius += yoffset;
@@ -1426,11 +1429,23 @@ bool CircleCollisionComputeShader::main_loop()
 			this->last_fps = static_cast<uint32_t>((float)frame_counter * (1000.0f / fps_timer));
 
 			sprintf_s(title, "%d FPS in %.8f (ms)", this->last_fps, this->frame_timer);
+			
+			sum_time += fps_timer;
+			count_frames += this->frame_counter;
 
 			glfwSetWindowTitle(this->window, title);
 
 			this->frame_counter = 0;
 			this->last_timestamp = t_end;
+		}
+				
+		static int all = 0;
+
+		if (count_frames >= 500)
+		{
+			all += count_frames;
+			std::cout << "Average Frame Time: " << (float)sum_time / all << std::endl;
+			count_frames = 0;
 		}
 
 		recreate_compute_command_buffers();

@@ -1,4 +1,4 @@
-#include "simple_simd_avx2_better.h"
+#include "simple_cpu_grid_partitioning.h"
 
 #include <set>
 #include <fstream>
@@ -7,154 +7,8 @@
 
 #define VERTEX_BUFFER_BIND_ID				0 // PER VERTEX
 #define COLOR_BUFFER_BIND_ID				1 // PER INSTANCE
-#define XPOSITIONS_BUFFER_BIND_ID			2 // PER INSTANCE
-#define YPOSITIONS_BUFFER_BIND_ID			3 // PER INSTANCE
-#define SCALE_BUFFER_BIND_ID				4 // PER INSTANCE
-
-#include <immintrin.h>
-
-static float sum_time = 0;
-static size_t count_frames = 0;
-
-// SIMD Constants
-#define SIMD
-
-static __m256 zero = _mm256_set1_ps(0);
-static __m256 one = _mm256_set1_ps(1);
-static __m256 two = _mm256_set1_ps(2);
-static __m256 five = _mm256_set1_ps(5);
-static __m256 minus_two = _mm256_set1_ps(-2);
-static __m256 width_vec = _mm256_set1_ps(screen_width);
-static __m256 height_vec = _mm256_set1_ps(screen_height);
-
-// 8x8 Latin Square
-__m256i rows[8] =
-{
-	_mm256_setr_epi32(0,1,7,2,6,3,5,4),
-	_mm256_setr_epi32(1,2,0,3,7,4,6,5),
-	_mm256_setr_epi32(2,3,1,4,0,5,7,6),
-	_mm256_setr_epi32(3,4,2,5,1,6,0,7),
-	_mm256_setr_epi32(4,5,3,6,2,7,1,0),
-	_mm256_setr_epi32(5,6,4,7,3,0,2,1),
-	_mm256_setr_epi32(6,7,5,0,4,1,3,2),
-	_mm256_setr_epi32(7,0,6,1,5,2,4,3)
-};
-
-// 8x8 Latin Square
-static __m256i reverse_rows[8];
-
-__m256 identity_rows[8] =
-{
-	_mm256_setr_ps(1,0,0,0,0,0,0,0),
-	_mm256_setr_ps(0,1,0,0,0,0,0,0),
-	_mm256_setr_ps(0,0,1,0,0,0,0,0),
-	_mm256_setr_ps(0,0,0,1,0,0,0,0),
-	_mm256_setr_ps(0,0,0,0,1,0,0,0),
-	_mm256_setr_ps(0,0,0,0,0,1,0,0),
-	_mm256_setr_ps(0,0,0,0,0,0,1,0),
-	_mm256_setr_ps(0,0,0,0,0,0,0,1),
-};
-
-__m256i self_check_rows[4] =
-{
-	_mm256_setr_epi32(1,2,3,4,5,6,7,0),
-	_mm256_setr_epi32(2,3,4,5,6,7,0,1),
-	_mm256_setr_epi32(3,4,5,6,7,0,1,2),
-	_mm256_setr_epi32(4,5,6,7,0,1,2,3),
-};
-
-__m256i reverse_self_check_rows[4];
-
-static void generate_rows()
-{
-	for (short i = 0; i < 8; ++i)
-	{
-		identity_rows[i] = _mm256_cmp_ps(identity_rows[i], one, _CMP_EQ_OQ);
-	}
-
-	for (short i = 0; i < 8; ++i)
-	{
-		uint32_t current[8];
-		uint32_t new_row[8];
-		_mm256_storeu_si256((__m256i*)(current), rows[i]);
-		for (size_t j = 0; j < 8; ++j)
-		{
-			new_row[current[j]] = j;
-		}
-		reverse_rows[i] = _mm256_loadu_si256((__m256i*)(new_row));
-	}
-
-	for (short i = 0; i < 4; ++i)
-	{
-		uint32_t current[8];
-		uint32_t new_row[8];
-		_mm256_storeu_si256((__m256i*)(current), self_check_rows[i]);
-		for (size_t j = 0; j < 8; ++j)
-		{
-			new_row[current[j]] = j;
-		}
-		reverse_self_check_rows[i] = _mm256_loadu_si256((__m256i*)(new_row));
-	}
-}
-
-inline float rand_vel_pre()
-{
-	return relative_velocity * (((rand() % 100) / 200.0f) * ((rand() % 2) * 2 - 1.0f)) * 3.0f;
-}
-
-inline __m256 rand_vel_vec(const __m256& scale)
-{
-	const __m256 pre = _mm256_setr_ps(
-		rand_vel_pre(),
-		rand_vel_pre(),
-		rand_vel_pre(),
-		rand_vel_pre(),
-		rand_vel_pre(),
-		rand_vel_pre(),
-		rand_vel_pre(),
-		rand_vel_pre());
-	return _mm256_div_ps(pre, _mm256_sqrt_ps(scale));
-}
-
-inline float rand_pos(const int& max)
-{
-	return rand() % (max - 2);
-}
-
-inline __m256 rand_pos_vec(const __m256& scale, const int& max)
-{
-	__m256 add = _mm256_setr_ps(
-		rand_pos(max),
-		rand_pos(max),
-		rand_pos(max),
-		rand_pos(max),
-		rand_pos(max),
-		rand_pos(max),
-		rand_pos(max),
-		rand_pos(max));
-
-	return _mm256_add_ps(scale, add);
-}
-
-inline float rand_scale()
-{
-	return min_size + (rand() % (max_size - min_size));
-}
-
-inline __m256 rand_scale_vec()
-{
-	return _mm256_setr_ps(
-		rand_scale(),
-		rand_scale(),
-		rand_scale(),
-		rand_scale(),
-		rand_scale(),
-		rand_scale(),
-		rand_scale(),
-		rand_scale()
-	);
-}
-
+#define POSITIONS_BUFFER_BIND_ID			2 // PER INSTANCE
+#define SCALE_BUFFER_BIND_ID				3 // PER INSTANCE
 
 using namespace renderer;
 
@@ -167,6 +21,9 @@ const std::vector<const char*> device_extensions = {
 	VK_KHR_SWAPCHAIN_EXTENSION_NAME
 };
 
+static float sum_time = 0;
+static size_t count_frames = 0;
+
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
 	mouse_draw_radius += yoffset;
@@ -177,7 +34,7 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 
 static void resize_callback(GLFWwindow* window, int width, int height)
 {
-	auto app = reinterpret_cast<CircleCollisionMultiThreadSIMD*>(glfwGetWindowUserPointer(window));
+	auto app = reinterpret_cast<CircleCollisionGridPartitioning*>(glfwGetWindowUserPointer(window));
 	app->window_resize();
 }
 
@@ -200,13 +57,14 @@ static std::vector<char> read_file(const std::string& fileName)
 	return buffer;
 }
 
-void CircleCollisionMultiThreadSIMD::initialize()
+void CircleCollisionGridPartitioning::initialize()
 {
+	this->grid.init_grid(16, 16);
 	srand(time(NULL));
 	validation_layers_enabled = false;
 }
 
-bool CircleCollisionMultiThreadSIMD::run()
+bool CircleCollisionGridPartitioning::run()
 {
 	if (!setup_window())
 		return false;
@@ -223,7 +81,7 @@ bool CircleCollisionMultiThreadSIMD::run()
 	return true;
 }
 
-bool CircleCollisionMultiThreadSIMD::setup_window()
+bool CircleCollisionGridPartitioning::setup_window()
 {
 	glfwInit();
 
@@ -238,7 +96,7 @@ bool CircleCollisionMultiThreadSIMD::setup_window()
 	return true;
 }
 
-bool CircleCollisionMultiThreadSIMD::setup_vulkan()
+bool CircleCollisionGridPartitioning::setup_vulkan()
 {
 	if (!create_instance())
 		return false;
@@ -286,7 +144,7 @@ bool CircleCollisionMultiThreadSIMD::setup_vulkan()
 	return true;
 }
 
-bool CircleCollisionMultiThreadSIMD::create_instance()
+bool CircleCollisionGridPartitioning::create_instance()
 {
 	VkApplicationInfo app_info = {};
 	app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -406,7 +264,7 @@ bool CircleCollisionMultiThreadSIMD::create_instance()
 	return result == VK_SUCCESS;
 }
 
-bool CircleCollisionMultiThreadSIMD::set_up_debug_messenger()
+bool CircleCollisionGridPartitioning::set_up_debug_messenger()
 {
 #if defined(_DEBUG)
 	if (!validation_layers_enabled)
@@ -444,7 +302,7 @@ bool CircleCollisionMultiThreadSIMD::set_up_debug_messenger()
 #endif
 }
 
-bool CircleCollisionMultiThreadSIMD::pick_physical_device()
+bool CircleCollisionGridPartitioning::pick_physical_device()
 {
 	uint32_t available_physical_devices_count = 0;
 	vkEnumeratePhysicalDevices(this->instance, &available_physical_devices_count, nullptr);
@@ -487,7 +345,7 @@ bool CircleCollisionMultiThreadSIMD::pick_physical_device()
 	return true;
 }
 
-bool CircleCollisionMultiThreadSIMD::check_device_extensions_support()
+bool CircleCollisionGridPartitioning::check_device_extensions_support()
 {
 	uint32_t available_extensions_count;
 	vkEnumerateDeviceExtensionProperties(this->physical_device, nullptr, &available_extensions_count, nullptr);
@@ -502,7 +360,7 @@ bool CircleCollisionMultiThreadSIMD::check_device_extensions_support()
 	return required_extensions.empty();
 }
 
-bool CircleCollisionMultiThreadSIMD::create_logical_device()
+bool CircleCollisionGridPartitioning::create_logical_device()
 {
 	if (!check_device_extensions_support())
 		return false;
@@ -553,12 +411,12 @@ bool CircleCollisionMultiThreadSIMD::create_logical_device()
 	return result == VK_SUCCESS;
 }
 
-bool CircleCollisionMultiThreadSIMD::create_surface()
+bool CircleCollisionGridPartitioning::create_surface()
 {
 	return glfwCreateWindowSurface(this->instance, this->window, nullptr, &this->surface) == VK_SUCCESS;
 }
 
-bool CircleCollisionMultiThreadSIMD::create_swap_chain()
+bool CircleCollisionGridPartitioning::create_swap_chain()
 {
 	// Get Properties
 
@@ -692,7 +550,7 @@ bool CircleCollisionMultiThreadSIMD::create_swap_chain()
 	return true;
 }
 
-bool CircleCollisionMultiThreadSIMD::create_image_views()
+bool CircleCollisionGridPartitioning::create_image_views()
 {
 	this->swap_chain_image_views.resize(this->swap_chain_images.size());
 
@@ -720,7 +578,7 @@ bool CircleCollisionMultiThreadSIMD::create_image_views()
 	return true;
 }
 
-bool CircleCollisionMultiThreadSIMD::create_renderpass()
+bool CircleCollisionGridPartitioning::create_renderpass()
 {
 	// Graphics Subpass
 	VkAttachmentReference color_attach_ref = {};
@@ -770,7 +628,7 @@ bool CircleCollisionMultiThreadSIMD::create_renderpass()
 	return true;
 }
 
-bool CircleCollisionMultiThreadSIMD::create_descriptor_set_layout()
+bool CircleCollisionGridPartitioning::create_descriptor_set_layout()
 {
 	VkDescriptorSetLayoutBinding descriptor_set_binding = {};
 	descriptor_set_binding.binding = 0;
@@ -790,18 +648,19 @@ bool CircleCollisionMultiThreadSIMD::create_descriptor_set_layout()
 	return true;
 }
 
-bool CircleCollisionMultiThreadSIMD::create_graphics_pipeline()
+bool CircleCollisionGridPartitioning::create_graphics_pipeline()
 {
 	std::string path = files::get_app_path();
 
-	auto vert_shader = read_file(path + "\\..\\..\\..\\..\\..\\src\\simple_simd_avx2_better\\shaders\\shaders.vert.spv");
-	auto frag_shader = read_file(path + "\\..\\..\\..\\..\\..\\src\\simple_simd_avx2_better\\shaders\\shaders.frag.spv");
+	auto vert_shader = read_file(path + "\\..\\..\\..\\..\\..\\src\\simple_cpu_grid_partitioning\\shaders\\shaders.vert.spv");
+	auto frag_shader = read_file(path + "\\..\\..\\..\\..\\..\\src\\simple_cpu_grid_partitioning\\shaders\\shaders.frag.spv");
 
 	if (vert_shader.empty() || frag_shader.empty())
 	{
 		log("Make sure shaders are correctly read from file.");
 		return false;
 	}
+
 	VkShaderModule vert_shader_module = helper::create_shader_module(this->device, vert_shader);
 	VkShaderModule frag_shader_module = helper::create_shader_module(this->device, frag_shader);
 
@@ -824,18 +683,16 @@ bool CircleCollisionMultiThreadSIMD::create_graphics_pipeline()
 	{
 		initializers::vertex_input_binding_description(VERTEX_BUFFER_BIND_ID, sizeof(vertex), VK_VERTEX_INPUT_RATE_VERTEX),
 		initializers::vertex_input_binding_description(COLOR_BUFFER_BIND_ID, sizeof(glm::vec3), VK_VERTEX_INPUT_RATE_INSTANCE),
-		initializers::vertex_input_binding_description(XPOSITIONS_BUFFER_BIND_ID, sizeof(float), VK_VERTEX_INPUT_RATE_INSTANCE),
-		initializers::vertex_input_binding_description(YPOSITIONS_BUFFER_BIND_ID, sizeof(float), VK_VERTEX_INPUT_RATE_INSTANCE),
+		initializers::vertex_input_binding_description(POSITIONS_BUFFER_BIND_ID, sizeof(glm::vec2), VK_VERTEX_INPUT_RATE_INSTANCE),
 		initializers::vertex_input_binding_description(SCALE_BUFFER_BIND_ID, sizeof(float), VK_VERTEX_INPUT_RATE_INSTANCE),
 	};
 
 	std::vector<VkVertexInputAttributeDescription> attributes =
 	{
 		initializers::vertex_input_attribute_description(VERTEX_BUFFER_BIND_ID,		0, VK_FORMAT_R32G32_SFLOAT, offsetof(vertex, pos)),
-		initializers::vertex_input_attribute_description(XPOSITIONS_BUFFER_BIND_ID,	1, VK_FORMAT_R32_SFLOAT, 0),
-		initializers::vertex_input_attribute_description(YPOSITIONS_BUFFER_BIND_ID,	2, VK_FORMAT_R32_SFLOAT, 0),
-		initializers::vertex_input_attribute_description(COLOR_BUFFER_BIND_ID,		3, VK_FORMAT_R32G32B32_SFLOAT, 0),
-		initializers::vertex_input_attribute_description(SCALE_BUFFER_BIND_ID,		4, VK_FORMAT_R32_SFLOAT, 0),
+		initializers::vertex_input_attribute_description(POSITIONS_BUFFER_BIND_ID,	1, VK_FORMAT_R32G32_SFLOAT, 0),
+		initializers::vertex_input_attribute_description(COLOR_BUFFER_BIND_ID,		2, VK_FORMAT_R32G32B32_SFLOAT, 0),
+		initializers::vertex_input_attribute_description(SCALE_BUFFER_BIND_ID,		3, VK_FORMAT_R32_SFLOAT, 0),
 	};
 
 	// VI
@@ -964,7 +821,7 @@ bool CircleCollisionMultiThreadSIMD::create_graphics_pipeline()
 	return true;
 }
 
-bool CircleCollisionMultiThreadSIMD::create_vertex_buffer()
+bool CircleCollisionGridPartitioning::create_vertex_buffer()
 {
 	get_circle_model(30, &this->circle_model);
 	const VkDeviceSize buffer_size = sizeof(vertex) * this->circle_model.vertices.size();
@@ -1009,7 +866,7 @@ bool CircleCollisionMultiThreadSIMD::create_vertex_buffer()
 	return true;
 }
 
-bool CircleCollisionMultiThreadSIMD::create_index_buffer()
+bool CircleCollisionGridPartitioning::create_index_buffer()
 {
 	const VkDeviceSize buffer_size = sizeof(uint16_t) * this->circle_model.indices.size();
 
@@ -1053,7 +910,7 @@ bool CircleCollisionMultiThreadSIMD::create_index_buffer()
 	return true;
 }
 
-bool CircleCollisionMultiThreadSIMD::create_instance_buffers()
+bool CircleCollisionGridPartitioning::create_instance_buffers()
 {
 	setup_circles();
 
@@ -1067,7 +924,7 @@ bool CircleCollisionMultiThreadSIMD::create_instance_buffers()
 	return true;
 }
 
-bool CircleCollisionMultiThreadSIMD::create_uniform_buffers()
+bool CircleCollisionGridPartitioning::create_uniform_buffers()
 {
 	const auto buffer_size = sizeof(UniformBufferObject);
 
@@ -1093,7 +950,7 @@ bool CircleCollisionMultiThreadSIMD::create_uniform_buffers()
 	return true;
 }
 
-bool CircleCollisionMultiThreadSIMD::create_descriptor_pool()
+bool CircleCollisionGridPartitioning::create_descriptor_pool()
 {
 	VkDescriptorPoolSize pool_size = {};
 	pool_size.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -1113,7 +970,7 @@ bool CircleCollisionMultiThreadSIMD::create_descriptor_pool()
 	return true;
 }
 
-bool CircleCollisionMultiThreadSIMD::create_descriptor_sets()
+bool CircleCollisionGridPartitioning::create_descriptor_sets()
 {
 	std::vector<VkDescriptorSetLayout> layouts(swap_chain_images.size(), ubo_descriptor_set_layout);
 
@@ -1148,7 +1005,7 @@ bool CircleCollisionMultiThreadSIMD::create_descriptor_sets()
 	}
 }
 
-bool CircleCollisionMultiThreadSIMD::create_frame_buffers()
+bool CircleCollisionGridPartitioning::create_frame_buffers()
 {
 	this->swap_chain_frame_buffers.resize(this->swap_chain_image_views.size());
 
@@ -1178,7 +1035,7 @@ bool CircleCollisionMultiThreadSIMD::create_frame_buffers()
 	return true;
 }
 
-bool CircleCollisionMultiThreadSIMD::create_command_pool()
+bool CircleCollisionGridPartitioning::create_command_pool()
 {
 	VkCommandPoolCreateInfo create_info = {};
 
@@ -1195,7 +1052,7 @@ bool CircleCollisionMultiThreadSIMD::create_command_pool()
 	return true;
 }
 
-bool CircleCollisionMultiThreadSIMD::create_command_buffers()
+bool CircleCollisionGridPartitioning::create_command_buffers()
 {
 	this->command_buffers.resize(this->swap_chain_frame_buffers.size());
 
@@ -1242,8 +1099,7 @@ bool CircleCollisionMultiThreadSIMD::create_command_buffers()
 
 			VkBuffer vertex_buffers[] = { this->vertex_buffer };
 			VkBuffer colors_buffers[] = { this->colors_buffer };
-			VkBuffer x_positions_buffers[] = { this->x_positions_buffer };
-			VkBuffer y_positions_buffers[] = { this->y_positions_buffer };
+			VkBuffer positions_buffers[] = { this->positions_buffer };
 			VkBuffer scales_buffers[] = { this->scales_buffer };
 			VkDeviceSize offsets[] = { 0 };
 
@@ -1254,9 +1110,7 @@ bool CircleCollisionMultiThreadSIMD::create_command_buffers()
 
 			vkCmdBindVertexBuffers(this->command_buffers[i], COLOR_BUFFER_BIND_ID, 1, colors_buffers, offsets);
 
-			vkCmdBindVertexBuffers(this->command_buffers[i], XPOSITIONS_BUFFER_BIND_ID, 1, x_positions_buffers, offsets);
-
-			vkCmdBindVertexBuffers(this->command_buffers[i], YPOSITIONS_BUFFER_BIND_ID, 1, y_positions_buffers, offsets);
+			vkCmdBindVertexBuffers(this->command_buffers[i], POSITIONS_BUFFER_BIND_ID, 1, positions_buffers, offsets);
 
 			vkCmdBindVertexBuffers(this->command_buffers[i], SCALE_BUFFER_BIND_ID, 1, scales_buffers, offsets);
 
@@ -1276,7 +1130,7 @@ bool CircleCollisionMultiThreadSIMD::create_command_buffers()
 	return true;
 }
 
-bool CircleCollisionMultiThreadSIMD::create_sync_objects()
+bool CircleCollisionGridPartitioning::create_sync_objects()
 {
 	this->num_frames = this->swap_chain_images.size();
 
@@ -1306,7 +1160,7 @@ bool CircleCollisionMultiThreadSIMD::create_sync_objects()
 	return true;
 }
 
-bool CircleCollisionMultiThreadSIMD::cleanup_swap_chain()
+bool CircleCollisionGridPartitioning::cleanup_swap_chain()
 {
 	for (auto& frame_buffer : this->swap_chain_frame_buffers)
 		vkDestroyFramebuffer(this->device, frame_buffer, nullptr);
@@ -1331,7 +1185,7 @@ bool CircleCollisionMultiThreadSIMD::cleanup_swap_chain()
 	return true;
 }
 
-bool CircleCollisionMultiThreadSIMD::recreate_swap_chain()
+bool CircleCollisionGridPartitioning::recreate_swap_chain()
 {
 	vkDeviceWaitIdle(this->device);
 
@@ -1367,7 +1221,7 @@ bool CircleCollisionMultiThreadSIMD::recreate_swap_chain()
 	return true;
 }
 
-bool CircleCollisionMultiThreadSIMD::set_viewport_scissor()
+bool CircleCollisionGridPartitioning::set_viewport_scissor()
 {
 	this->viewport = {};
 	viewport.x = 0.0f;
@@ -1384,18 +1238,7 @@ bool CircleCollisionMultiThreadSIMD::set_viewport_scissor()
 	return true;
 }
 
-template <class V, class T>
-inline void print_vec(V vec)
-{
-	T* vecf = reinterpret_cast<T*>(&vec);
-
-	for (short i = 0; i < 8; ++i)
-		std::cout << "(" << i << "): " << vecf[i] << std::endl;
-
-	std::cout << std::endl;
-}
-
-void CircleCollisionMultiThreadSIMD::update(const uint32_t& current_image)
+void CircleCollisionGridPartitioning::update(const uint32_t& current_image)
 {
 	static auto start_time = std::chrono::high_resolution_clock::now();
 
@@ -1422,239 +1265,108 @@ void CircleCollisionMultiThreadSIMD::update(const uint32_t& current_image)
 	const auto right_wall = (mouse_bounding_enabled && draw) ? mouse_pos.x : screen_width;
 	const auto bottom_wall = (mouse_bounding_enabled && draw) ? mouse_pos.y : screen_height;
 
-	const __m256 frame_time_vec = _mm256_set1_ps(this->frame_timer);
-	for (size_t i = 0; i < vectors_size; ++i)
+	for (size_t i = 0; i < instance_count; ++i)
 	{
-		this->circles.x_positions[i] = _mm256_add_ps(
-			this->circles.x_positions[i],
-			_mm256_mul_ps(this->circles.x_velocities[i], frame_time_vec));
-		this->circles.y_positions[i] = _mm256_add_ps(
-			this->circles.y_positions[i],
-			_mm256_mul_ps(this->circles.y_velocities[i], frame_time_vec));
+		if (draw && glm::distance(this->circles.positions[i], mouse_pos) < mouse_draw_radius)
+		{
+			this->circles.velocities[i] = -1.0f * (mouse_pos - this->circles.positions[i]) * 10e-3f;
+		}
+
+		this->circles.positions[i] += this->circles.velocities[i] * this->frame_timer;
+	}
+
+	for (size_t i = 0; i < instance_count; ++i)
+	{
+		if (this->circles.positions[i].y - this->circles.scales[i] <= 0)
+		{
+			this->circles.positions[i].y = this->circles.scales[i];
+			this->circles.velocities[i].y *= -1;
+		}
+		else if (this->circles.positions[i].y + this->circles.scales[i] >= bottom_wall)
+		{
+			this->circles.positions[i].y = bottom_wall - this->circles.scales[i];
+			this->circles.velocities[i].y *= -1;
+		}
+
+		if (this->circles.positions[i].x - this->circles.scales[i] <= 0)
+		{
+			this->circles.positions[i].x = this->circles.scales[i];
+			this->circles.velocities[i].x *= -1;
+		}
+		else if (this->circles.positions[i].x + this->circles.scales[i] >= right_wall)
+		{
+			this->circles.positions[i].x = right_wall - this->circles.scales[i];
+			this->circles.velocities[i].x *= -1;
+		}
 	}
 
 
-	const auto t1 = std::chrono::high_resolution_clock::now();
-
-	// Branches aren't always bad
-	// as tested these branches in the following loop are ~4x better than without them
-	// GUESS: Branch Prediction : since there are less balls on the corners than in the middle
-	// Maybe Balls Count and Window Size might affect the speed up of putting these branches
-	// Compiler = MSVC
-	for (size_t i = 0; i < vectors_size; ++i)
+	// Add Circles To Partitions
+	for (size_t i = 0; i < instance_count; ++i)
 	{
-		// Left
-		const __m256 left = _mm256_sub_ps(this->circles.x_positions[i], this->circles.scales[i]);
-		__m256 cmp = _mm256_cmp_ps(left, zero, _CMP_LE_OQ);
-		if (_mm_popcnt_u32(_mm256_movemask_ps(cmp)) > 0)
-		{
-			__m256 clamped = _mm256_min_ps(cmp, _mm256_set1_ps(1));
-			__m256 inverse = _mm256_sub_ps(one, clamped);
-			__m256 mul = _mm256_fmadd_ps(clamped, minus_two, one);
-			this->circles.x_velocities[i] = _mm256_mul_ps(this->circles.x_velocities[i], mul);
-			this->circles.x_positions[i] = _mm256_add_ps(_mm256_mul_ps(inverse, this->circles.x_positions[i]), _mm256_mul_ps(clamped, this->circles.scales[i]));
-		}
-
-		// Right
-		const __m256 right = _mm256_add_ps(this->circles.x_positions[i], this->circles.scales[i]);
-		cmp = _mm256_cmp_ps(right, width_vec, _CMP_GE_OQ);
-		if (_mm_popcnt_u32(_mm256_movemask_ps(cmp)) > 0)
-		{
-			__m256 clamped = _mm256_min_ps(cmp, _mm256_set1_ps(1));
-			__m256 inverse = _mm256_sub_ps(one, clamped);
-			__m256 mul = _mm256_fmadd_ps(clamped, minus_two, one);
-			this->circles.x_velocities[i] = _mm256_mul_ps(this->circles.x_velocities[i], mul);
-			this->circles.x_positions[i] = _mm256_add_ps(_mm256_mul_ps(inverse, this->circles.x_positions[i]), _mm256_mul_ps(clamped, _mm256_sub_ps(width_vec, this->circles.scales[i])));
-		}
-
-		// Bottom
-		const __m256 bottom = _mm256_sub_ps(this->circles.y_positions[i], this->circles.scales[i]);
-		cmp = _mm256_cmp_ps(bottom, zero, _CMP_LE_OQ);
-		if (_mm_popcnt_u32(_mm256_movemask_ps(cmp)) > 0)
-		{
-			__m256 clamped = _mm256_min_ps(cmp, _mm256_set1_ps(1));
-			__m256 inverse = _mm256_sub_ps(one, clamped);
-			__m256 mul = _mm256_fmadd_ps(clamped, minus_two, one);
-			this->circles.y_velocities[i] = _mm256_mul_ps(this->circles.y_velocities[i], mul);
-			this->circles.y_positions[i] = _mm256_add_ps(_mm256_mul_ps(inverse, this->circles.y_positions[i]), _mm256_mul_ps(clamped, this->circles.scales[i]));
-		}
-
-		// Top
-		const __m256 top = _mm256_add_ps(this->circles.y_positions[i], this->circles.scales[i]);
-		cmp = _mm256_cmp_ps(top, height_vec, _CMP_GE_OQ);
-		if (_mm_popcnt_u32(_mm256_movemask_ps(cmp)) > 0)
-		{
-			__m256 clamped = _mm256_min_ps(cmp, _mm256_set1_ps(1));
-			__m256 inverse = _mm256_sub_ps(one, clamped);
-			__m256 mul = _mm256_fmadd_ps(clamped, minus_two, one);
-			this->circles.y_velocities[i] = _mm256_mul_ps(this->circles.y_velocities[i], mul);
-			this->circles.y_positions[i] = _mm256_add_ps(_mm256_mul_ps(inverse, this->circles.y_positions[i]), _mm256_mul_ps(clamped, _mm256_sub_ps(height_vec, this->circles.scales[i])));
-		}
+		this->grid.add_circle_to_partition(i, this->circles.positions[i].x, this->circles.positions[i].y, this->circles.scales[i]);
 	}
-	const auto t2 = std::chrono::high_resolution_clock::now();
+	
+	std::vector<std::pair<size_t, size_t>> collided;
 
-	for (size i = 0; i < vectors_size; ++i)
+	for (uint16_t k = 0; k < this->grid.partition_indexes.size(); ++k)
 	{
-		// Vector Self Checks
-		for (size j = 0; j < 4; ++j)
+		size partition_size = this->grid.partition_indexes[k].size();
+
+		for (size_t n = 0; n < partition_size; ++n)
 		{
-			__m256& x1 = circles.x_positions[i];
-			__m256& y1 = circles.y_positions[i];
-			__m256& s1 = circles.scales[i];
-
-			const __m256 x2 = _mm256_permutevar8x32_ps(x1, self_check_rows[j]);
-			const __m256 y2 = _mm256_permutevar8x32_ps(y1, self_check_rows[j]);
-			const __m256 s2 = _mm256_permutevar8x32_ps(s1, self_check_rows[j]);
-
-			const __m256 dx = _mm256_sub_ps(x2, x1);
-			const __m256 dy = _mm256_sub_ps(y2, y1);
-			const __m256 ds = _mm256_sub_ps(s2, s1);
-
-			const __m256 dis2 = _mm256_fmadd_ps(dy, dy, _mm256_mul_ps(dx, dx));
-			const __m256 radii = _mm256_add_ps(s1, s2);
-			const __m256 radii2 = _mm256_mul_ps(radii, radii);
-
-			const __m256 compare = _mm256_cmp_ps(dis2, radii2, _CMP_LE_OQ);
-
-			if (_mm256_movemask_ps(compare) > 0)
+			for (size_t m = n + 1; m < partition_size; ++m)
 			{
-				// Move Away
-				const __m256 dis = _mm256_sqrt_ps(_mm256_fmadd_ps(dy, dy, _mm256_mul_ps(dx, dx)));
-				const __m256 covered_by_2 = _mm256_div_ps(_mm256_sub_ps(radii, dis), two);
+				size_t i = this->grid.partition_indexes[k][n];
+				size_t j = this->grid.partition_indexes[k][m];
 
-				// Perp Vec
-				const __m256 n_x = _mm256_div_ps(dx, dis);
-				const __m256 n_y = _mm256_div_ps(dy, dis);
+				const auto dx = this->circles.positions[i].x - this->circles.positions[j].x;
+				const auto dy = this->circles.positions[i].y - this->circles.positions[j].y;
+				const auto dis2 = (dy * dy + dx * dx);
+				const auto radii = this->circles.scales[i] + this->circles.scales[j];
 
-				const __m256 move_x = _mm256_blendv_ps(zero, _mm256_mul_ps(n_x, covered_by_2), compare);
-				const __m256 move_y = _mm256_blendv_ps(zero, _mm256_mul_ps(n_y, covered_by_2), compare);
-
-				circles.x_positions[i] = _mm256_sub_ps(x1, move_x);
-				circles.y_positions[i] = _mm256_sub_ps(y1, move_y);
-				circles.x_positions[i] = _mm256_add_ps(x1, _mm256_permutevar8x32_ps(move_x, reverse_self_check_rows[j]));
-				circles.y_positions[i] = _mm256_add_ps(y1, _mm256_permutevar8x32_ps(move_y, reverse_self_check_rows[j]));
-
-				// Change Velocity Direction
-
-				for (short h = 0; h < 8; ++h)
+				if (dis2 < radii * radii)
 				{
-					const __m256 cmp = _mm256_blendv_ps(zero, compare, identity_rows[h]);
-
-					if (_mm256_movemask_ps(cmp) == 0)
-						continue;
-
-					const __m256 v2_x = _mm256_permutevar8x32_ps(this->circles.x_velocities[i], self_check_rows[j]);
-					const __m256 v2_y = _mm256_permutevar8x32_ps(this->circles.y_velocities[i], self_check_rows[j]);
-
-					const __m256 m1 = _mm256_mul_ps(this->circles.scales[i], one);
-					const __m256 m2 = _mm256_mul_ps(s2, one);
-					const __m256 sum_mass = _mm256_add_ps(m1, m2);
-
-					const __m256 dot1 = _mm256_fmadd_ps(n_x, this->circles.x_velocities[i], _mm256_mul_ps(n_y, this->circles.y_velocities[i]));
-					const __m256 dot2 = _mm256_fmadd_ps(n_x, v2_x, _mm256_mul_ps(n_y, v2_y));
-
-					const __m256 p = _mm256_div_ps(_mm256_mul_ps(_mm256_sub_ps(dot1, dot2), two), sum_mass);
-
-					const __m256 mvel1_x = _mm256_blendv_ps(zero, _mm256_mul_ps(p, _mm256_mul_ps(m2, n_x)), cmp);
-					const __m256 mvel1_y = _mm256_blendv_ps(zero, _mm256_mul_ps(p, _mm256_mul_ps(m2, n_y)), cmp);
-					const __m256 mvel2_x = _mm256_blendv_ps(zero, _mm256_mul_ps(p, _mm256_mul_ps(m1, n_x)), cmp);
-					const __m256 mvel2_y = _mm256_blendv_ps(zero, _mm256_mul_ps(p, _mm256_mul_ps(m1, n_y)), cmp);
-
-					this->circles.x_velocities[i] = _mm256_sub_ps(this->circles.x_velocities[i], mvel1_x);
-					this->circles.y_velocities[i] = _mm256_sub_ps(this->circles.y_velocities[i], mvel1_y);
-
-					this->circles.x_velocities[i] = _mm256_add_ps(this->circles.x_velocities[i], _mm256_permutevar8x32_ps(mvel2_x, reverse_self_check_rows[j]));
-					this->circles.y_velocities[i] = _mm256_add_ps(this->circles.y_velocities[i], _mm256_permutevar8x32_ps(mvel2_y, reverse_self_check_rows[j]));
+					collided.push_back(std::pair<size_t, size_t>(i, j));
 				}
 			}
 		}
-
-		// Vector Other Checks
-		for (size j = i + 1; j < vectors_size; ++j)
-		{
-			for (size k = 0; k < 8; ++k)
-			{
-				const __m256 x1 = _mm256_permutevar8x32_ps(circles.x_positions[i], rows[k]);
-				const __m256 y1 = _mm256_permutevar8x32_ps(circles.y_positions[i], rows[k]);
-				const __m256 s1 = _mm256_permutevar8x32_ps(circles.scales[i], rows[k]);
-
-				const __m256 dx = _mm256_sub_ps(x1, circles.x_positions[j]);
-				const __m256 dy = _mm256_sub_ps(y1, circles.y_positions[j]);
-
-				const __m256 dis2 = _mm256_fmadd_ps(dy, dy, _mm256_fmadd_ps(dx, dx, zero));
-				const __m256 radii = _mm256_add_ps(circles.scales[j], s1);
-				const __m256 radii2 = _mm256_mul_ps(radii, radii);
-
-				const __m256 compare = _mm256_cmp_ps(dis2, radii2, _CMP_LE_OQ);
-
-				if (_mm256_movemask_ps(compare) > 0)
-				{
-					// Move Away
-					const __m256 dis = _mm256_sqrt_ps(_mm256_fmadd_ps(dy, dy, _mm256_mul_ps(dx, dx)));
-					const __m256 covered_by_2 = _mm256_div_ps(_mm256_sub_ps(radii, dis), two);
-
-					// Perp Vec
-					const __m256 n_x = _mm256_div_ps(dx, dis);
-					const __m256 n_y = _mm256_div_ps(dy, dis);
-
-					const __m256 move_x = _mm256_blendv_ps(zero, _mm256_mul_ps(n_x, covered_by_2), compare);
-					const __m256 move_y = _mm256_blendv_ps(zero, _mm256_mul_ps(n_y, covered_by_2), compare);
-
-					circles.x_positions[j] = _mm256_sub_ps(circles.x_positions[j], move_x);
-					circles.y_positions[j] = _mm256_sub_ps(circles.y_positions[j], move_y);
-					circles.x_positions[i] = _mm256_add_ps(circles.x_positions[i], _mm256_permutevar8x32_ps(move_x, reverse_rows[k]));
-					circles.y_positions[i] = _mm256_add_ps(circles.y_positions[i], _mm256_permutevar8x32_ps(move_y, reverse_rows[k]));
-
-					// Change Velocity Direction
-					const __m256 m1 = _mm256_mul_ps(s1, five);
-					const __m256 m2 = _mm256_mul_ps(this->circles.scales[j], five);
-					const __m256 sum_mass = _mm256_add_ps(m1, m2);
-
-					const __m256 v1_x = _mm256_permutevar8x32_ps(this->circles.x_velocities[i], rows[k]);
-					const __m256 v1_y = _mm256_permutevar8x32_ps(this->circles.y_velocities[i], rows[k]);
-
-					const __m256 dot1_x = _mm256_mul_ps(n_x, v1_x);
-					const __m256 dot1_y = _mm256_mul_ps(n_y, v1_y);
-					const __m256 dot1 = _mm256_add_ps(dot1_x, dot1_y);
-
-					const __m256 dot2_x = _mm256_mul_ps(n_x, this->circles.x_velocities[j]);
-					const __m256 dot2_y = _mm256_mul_ps(n_y, this->circles.y_velocities[j]);
-					const __m256 dot2 = _mm256_add_ps(dot2_x, dot2_y);
-
-					const __m256 p = _mm256_mul_ps(_mm256_div_ps(two, sum_mass), _mm256_sub_ps(dot1, dot2));
-
-					const __m256 mvel1_x = _mm256_blendv_ps(zero, _mm256_mul_ps(n_x, _mm256_mul_ps(m2, p)), compare);
-					const __m256 mvel1_y = _mm256_blendv_ps(zero, _mm256_mul_ps(n_y, _mm256_mul_ps(m2, p)), compare);
-					const __m256 mvel2_x = _mm256_blendv_ps(zero, _mm256_mul_ps(n_x, _mm256_mul_ps(m1, p)), compare);
-					const __m256 mvel2_y = _mm256_blendv_ps(zero, _mm256_mul_ps(n_y, _mm256_mul_ps(m1, p)), compare);
-
-					this->circles.x_velocities[i] = _mm256_sub_ps(this->circles.x_velocities[i], _mm256_permutevar8x32_ps(mvel1_x, reverse_rows[k]));
-					this->circles.y_velocities[i] = _mm256_sub_ps(this->circles.y_velocities[i], _mm256_permutevar8x32_ps(mvel1_y, reverse_rows[k]));
-
-					this->circles.x_velocities[j] = _mm256_add_ps(this->circles.x_velocities[j], mvel2_x);
-					this->circles.y_velocities[j] = _mm256_add_ps(this->circles.y_velocities[j], mvel2_y);
-				}
-			}
-
-		}
 	}
 
-	const auto t3 = std::chrono::high_resolution_clock::now();
-	const auto detection = std::chrono::duration<double, std::milli>(t2 - t1).count();
-	const auto handle = std::chrono::duration<double, std::milli>(t3 - t2).count();
-	//sprintf_s(title, "Wall Handle: %.8f(ms), Collision Handle: %.8f(ms)", detection, handle);
+	this->grid.clear_partitions();
+
+	for (size_t k = 0; k < collided.size(); ++k)
+	{
+		int i = collided[k].first;
+		int j = collided[k].second;
+
+		const auto dx = this->circles.positions[i].x - this->circles.positions[j].x;
+		const auto dy = this->circles.positions[i].y - this->circles.positions[j].y;
+		const auto radii = this->circles.scales[i] + this->circles.scales[j];
+
+		// Move Away
+		const auto dis = glm::sqrt((dy * dy + dx * dx));
+		const auto n = glm::vec2(dx / dis, dy / dis);
+		const auto covered = radii - dis;
+		const auto move_vec = n * (covered / 2.0f);
+		this->circles.positions[i] += move_vec;
+		this->circles.positions[j] -= move_vec;
+
+		// Change Velocity Direction
+		const auto m1 = this->circles.scales[i] * 5.0f;
+		const auto m2 = this->circles.scales[j] * 5.0f;
+		const auto p = 2 * (glm::dot(n, this->circles.velocities[i]) - glm::dot(n, this->circles.velocities[j])) / (m1 + m2);
+		this->circles.velocities[i] = (this->circles.velocities[i] - n * m2 * p);
+		this->circles.velocities[j] = (this->circles.velocities[j] + n * m1 * p);
+	}
 
 	if (draw)
 		draw = false;
 
-	static const auto positions_update_size = sizeof(float) * instance_count;
-	vkMapMemory(this->device, this->x_positions_buffer_memory, 0, positions_update_size, 0, &data);
-	memcpy(data, this->circles.x_positions, positions_update_size);
-	vkUnmapMemory(this->device, this->x_positions_buffer_memory);
-
-	vkMapMemory(this->device, this->y_positions_buffer_memory, 0, positions_update_size, 0, &data);
-	memcpy(data, this->circles.y_positions, positions_update_size);
-	vkUnmapMemory(this->device, this->y_positions_buffer_memory);
+	static const auto positions_update_size = sizeof(glm::vec2) * instance_count;
+	vkMapMemory(this->device, this->positions_buffer_memory, 0, positions_update_size, 0, &data);
+	memcpy(data, this->circles.positions.data(), positions_update_size);
+	vkUnmapMemory(this->device, this->positions_buffer_memory);
 
 	UniformBufferObject ubo = {};
 
@@ -1667,7 +1379,7 @@ void CircleCollisionMultiThreadSIMD::update(const uint32_t& current_image)
 	vkUnmapMemory(this->device, this->ubo_buffers_memory[current_image]);
 }
 
-bool CircleCollisionMultiThreadSIMD::draw_frame()
+bool CircleCollisionGridPartitioning::draw_frame()
 {
 	vkWaitForFences(this->device, 1, &this->draw_fences[this->current_frame], VK_TRUE, std::numeric_limits<uint64_t>::max());
 
@@ -1753,7 +1465,7 @@ bool CircleCollisionMultiThreadSIMD::draw_frame()
 	return true;
 }
 
-bool CircleCollisionMultiThreadSIMD::main_loop()
+bool CircleCollisionGridPartitioning::main_loop()
 {
 	this->last_timestamp = std::chrono::high_resolution_clock::now();
 
@@ -1787,8 +1499,6 @@ bool CircleCollisionMultiThreadSIMD::main_loop()
 			this->last_timestamp = t_end;
 		}
 
-		glfwPollEvents();
-
 		static int all = 0;
 
 		if (count_frames >= 500)
@@ -1798,17 +1508,16 @@ bool CircleCollisionMultiThreadSIMD::main_loop()
 			count_frames = 0;
 		}
 
+		glfwPollEvents();
 	}
 
 	return true;
 }
 
-bool CircleCollisionMultiThreadSIMD::release()
+bool CircleCollisionGridPartitioning::release()
 {
 	if (is_released)
 		return true;
-
-	circles.release();
 
 	vkDeviceWaitIdle(this->device);
 
@@ -1818,7 +1527,7 @@ bool CircleCollisionMultiThreadSIMD::release()
 	if (DestroyDebugUtilsMessengerEXT != nullptr)
 	{
 		DestroyDebugUtilsMessengerEXT(this->instance, this->debug_messenger, nullptr);
-}
+	}
 #endif
 
 	if (this->device)
@@ -1832,11 +1541,8 @@ bool CircleCollisionMultiThreadSIMD::release()
 		vkDestroyBuffer(this->device, this->colors_buffer, nullptr);
 		vkFreeMemory(this->device, this->colors_buffer_memory, nullptr);
 
-		vkDestroyBuffer(this->device, this->x_positions_buffer, nullptr);
-		vkFreeMemory(this->device, this->x_positions_buffer_memory, nullptr);
-
-		vkDestroyBuffer(this->device, this->y_positions_buffer, nullptr);
-		vkFreeMemory(this->device, this->y_positions_buffer_memory, nullptr);
+		vkDestroyBuffer(this->device, this->positions_buffer, nullptr);
+		vkFreeMemory(this->device, this->positions_buffer_memory, nullptr);
 
 		vkDestroyBuffer(this->device, this->scales_buffer, nullptr);
 		vkFreeMemory(this->device, this->scales_buffer_memory, nullptr);
@@ -1876,12 +1582,12 @@ bool CircleCollisionMultiThreadSIMD::release()
 	return true;
 }
 
-void CircleCollisionMultiThreadSIMD::window_resize()
+void CircleCollisionGridPartitioning::window_resize()
 {
 	this->should_recreate_swapchain = true;
 }
 
-bool CircleCollisionMultiThreadSIMD::create_colors_buffer()
+bool CircleCollisionGridPartitioning::create_colors_buffer()
 {
 	const VkDeviceSize buffer_size = sizeof(glm::vec3) * instance_count;
 
@@ -1899,15 +1605,15 @@ bool CircleCollisionMultiThreadSIMD::create_colors_buffer()
 
 	void* data = nullptr;
 	vkMapMemory(this->device, this->colors_buffer_memory, 0, buffer_size, 0, &data);
-	memcpy(data, this->circles.colors, buffer_size);
+	memcpy(data, this->circles.colors.data(), buffer_size);
 	vkUnmapMemory(this->device, this->colors_buffer_memory);
 
 	return true;
 }
 
-bool CircleCollisionMultiThreadSIMD::create_positions_buffer()
+bool CircleCollisionGridPartitioning::create_positions_buffer()
 {
-	const VkDeviceSize buffer_size = sizeof(float) * instance_count;
+	const VkDeviceSize buffer_size = sizeof(glm::vec2) * instance_count;
 
 	if (!helper::create_buffer(
 		this->device,
@@ -1915,37 +1621,21 @@ bool CircleCollisionMultiThreadSIMD::create_positions_buffer()
 		buffer_size,
 		VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
 		VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT,
-		this->x_positions_buffer,
-		this->x_positions_buffer_memory))
+		this->positions_buffer,
+		this->positions_buffer_memory))
 	{
 		return false;
 	}
 
 	void* data = nullptr;
-	vkMapMemory(this->device, this->x_positions_buffer_memory, 0, buffer_size, 0, &data);
-	memcpy(data, this->circles.x_positions, buffer_size);
-	vkUnmapMemory(this->device, this->x_positions_buffer_memory);
-
-	if (!helper::create_buffer(
-		this->device,
-		this->physical_device,
-		buffer_size,
-		VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-		VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT,
-		this->y_positions_buffer,
-		this->y_positions_buffer_memory))
-	{
-		return false;
-	}
-
-	vkMapMemory(this->device, this->y_positions_buffer_memory, 0, buffer_size, 0, &data);
-	memcpy(data, this->circles.y_positions, buffer_size);
-	vkUnmapMemory(this->device, this->y_positions_buffer_memory);
+	vkMapMemory(this->device, this->positions_buffer_memory, 0, buffer_size, 0, &data);
+	memcpy(data, this->circles.positions.data(), buffer_size);
+	vkUnmapMemory(this->device, this->positions_buffer_memory);
 
 	return true;
 }
 
-bool CircleCollisionMultiThreadSIMD::create_scales_buffer()
+bool CircleCollisionGridPartitioning::create_scales_buffer()
 {
 	const VkDeviceSize buffer_size = sizeof(float) * instance_count;
 
@@ -1966,7 +1656,7 @@ bool CircleCollisionMultiThreadSIMD::create_scales_buffer()
 
 	void* data = nullptr;
 	vkMapMemory(this->device, staging_buffer_memory, 0, buffer_size, 0, &data);
-	memcpy(data, this->circles.scales, buffer_size);
+	memcpy(data, this->circles.scales.data(), buffer_size);
 	vkUnmapMemory(this->device, staging_buffer_memory);
 
 	if (!helper::create_buffer(
@@ -1989,37 +1679,20 @@ bool CircleCollisionMultiThreadSIMD::create_scales_buffer()
 	return true;
 }
 
-void CircleCollisionMultiThreadSIMD::setup_circles()
+void CircleCollisionGridPartitioning::setup_circles()
 {
-	this->circles.resize();
+	this->circles.resize(instance_count);
+
+	const int max_size = relative_scale * glm::sqrt((screen_width * screen_height) / instance_count) * 0.5f;
+	const int min_size = max_size / 3;
 
 	for (size_t i = 0; i < instance_count; ++i)
 	{
+		this->circles.scales[i] = min_size + (rand() % (max_size - min_size));
+		this->circles.velocities[i] = relative_velocity * glm::vec2(((rand() % 100) / 200.0f) * ((rand() % 2) * 2 - 1.0f), (rand() % 100) / 200.0f * ((rand() % 2) * 2 - 1.0f)) / glm::sqrt(this->circles.scales[i]) * 3.0f;
+		this->circles.positions[i] = glm::vec2(
+			this->circles.scales[i] + rand() % (screen_width - 2 * static_cast<int>(this->circles.scales[i])),
+			this->circles.scales[i] + rand() % (screen_height - 2 * static_cast<int>(this->circles.scales[i])));
 		this->circles.colors[i] = glm::vec3((rand() % 255) / 255.0f, (rand() % 255) / 255.0f, (rand() % 255) / 255.0f);
 	}
-
-	for (size_t i = 0; i < vectors_size; ++i)
-	{
-		this->circles.scales[i] = rand_scale_vec();
-
-		this->circles.x_velocities[i] = rand_vel_vec(this->circles.scales[i]);
-		this->circles.y_velocities[i] = rand_vel_vec(this->circles.scales[i]);
-
-		this->circles.x_positions[i] = rand_pos_vec(this->circles.scales[i], screen_width);
-		this->circles.y_positions[i] = rand_pos_vec(this->circles.scales[i], screen_height);
-	}
-
-	float mulf[8];
-	const int ones = instance_count % 8;
-	for (int i = 0; i < ones; ++i)
-		mulf[i] = 1;
-	for (int i = ones; i < 8; ++i)
-		mulf[i] = 0;
-
-	generate_rows();
-	this->circles.scales[vectors_size - 1] = _mm256_mul_ps(this->circles.scales[vectors_size - 1], _mm256_loadu_ps(mulf));
-	this->circles.x_positions[vectors_size - 1] = _mm256_div_ps(this->circles.x_positions[vectors_size - 1], _mm256_loadu_ps(mulf));
-	this->circles.y_positions[vectors_size - 1] = _mm256_div_ps(this->circles.y_positions[vectors_size - 1], _mm256_loadu_ps(mulf));
-
-	const size padding_count = dividible_size - instance_count;
 }

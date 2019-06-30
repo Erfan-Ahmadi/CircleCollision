@@ -23,7 +23,14 @@ Implementing Different Methods of Circle to Circle Collision Detection using Vul
  <img src="https://raw.githubusercontent.com/Erfan-Ahmadi/circle_collision/master/docs/heart_collision.jpg" alt="" width="320" height="180" />
  <img src="https://raw.githubusercontent.com/Erfan-Ahmadi/circle_collision/master/docs/draw-fun.gif" alt="" width="320" height="180" />
  <img src="https://raw.githubusercontent.com/Erfan-Ahmadi/circle_collision/master/docs/explode_fun.gif" alt="" width="320" height="180" />
+</p>
 
+# Charts and Plots
+
+<p align="center">
+ 
+ <img src="https://raw.githubusercontent.com/Erfan-Ahmadi/CircleCollision/master/docs/Brute%20Force.png"/>
+ <img src="https://raw.githubusercontent.com/Erfan-Ahmadi/CircleCollision/master/docs/Grid%20Spatial%20Partitioning.png"/>
 </p>
  
 # Motivation

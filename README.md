@@ -74,6 +74,7 @@ This Project Is For Learning Purposes of Following Topics
 - Spatial Partitioning
   - Grid
     - [x] [CPU](https://github.com/Erfan-Ahmadi/CircleCollision/tree/master/build/Visual%20Studio%202019/simple_cpu_grid_partitioning)
+    - [x] [Multi-Threaded](https://github.com/Erfan-Ahmadi/CircleCollision/tree/master/build/Visual%20Studio%202019/grid_partitioning_multithread_stl)
 
 # Build
 - [**Visual Studio 2019**](https://github.com/Erfan-Ahmadi/CircleCollision/tree/master/build/Visual%20Studio%202019) 

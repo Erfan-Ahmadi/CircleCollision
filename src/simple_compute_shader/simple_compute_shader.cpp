@@ -1833,8 +1833,8 @@ bool CircleCollisionComputeShader::record_compute_command_buffers()
     barrier.buffer = this->compute.position_buffer.buffer;
     barrier.offset = this->compute.position_buffer.offset;
     barrier.size = this->compute.position_buffer.size;
-    barrier.srcAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
-    barrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT; // ??
+    barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT; // ??
     barrier.srcQueueFamilyIndex = this->family_indices.graphics_family.value();
     barrier.dstQueueFamilyIndex = this->family_indices.compute_family.value();
 
@@ -1852,7 +1852,7 @@ bool CircleCollisionComputeShader::record_compute_command_buffers()
     barrier.offset = this->compute.position_buffer.offset;
     barrier.size = this->compute.position_buffer.size;
     barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-    barrier.dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
+    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
     barrier.srcQueueFamilyIndex = this->family_indices.compute_family.value();
     barrier.dstQueueFamilyIndex = this->family_indices.graphics_family.value();
 
